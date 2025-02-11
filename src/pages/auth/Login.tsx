@@ -4,10 +4,10 @@ import { User, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 import FaceRecognition from '../../components/FaceRecognition';
+import api from '../../services/api';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, verifyFace } = useAuth();
   const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
   const [loginMethod, setLoginMethod] = useState<'face' | 'credentials'>('credentials');
   const [error, setError] = useState('');
@@ -29,25 +29,26 @@ const Login = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await login(formData.email, formData.password);
+
+      const endpoint = activeTab === 'doctor' ? '/auth/doctor/login' : '/auth/patient/login';
+      const response = await api.post(endpoint, formData);
       
-      // Get user role from the response
-      const userRole = response?.data?.user?.role || activeTab;
-      
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      console.log(response.data);
+
       toast.success('Login successful!');
       
-      // Navigate based on user role
-      if (userRole === 'doctor') {
+      // Redirect based on user role
+      if (user.role === 'doctor') {
         navigate('/doctor/dashboard');
-      } else if (userRole === 'patient') {
+      } else if (user.role === 'patient') {
         navigate('/patient/dashboard');
-      } else {
-        // Fallback navigation if role is not determined
-        navigate('/');
-        toast.error('Unable to determine user role');
+      } else if (user.role === 'admin') {
+        navigate('/admin/dashboard');
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Login failed';
       setError(message);
       toast.error(message);
     } finally {
@@ -59,22 +60,23 @@ const Login = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await verifyFace(image);
-      
-      // Get user role from the response
-      const userRole = response?.data?.user?.role || 'patient';
-      
+
+      const formData = new FormData();
+      formData.append('face', image);
+
+      const response = await api.post('/auth/patient/face-login', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+
       toast.success('Face verification successful!');
-      
-      // Navigate based on user role
-      if (userRole === 'patient') {
-        navigate('/patient/dashboard');
-      } else {
-        navigate('/');
-        toast.error('Face login is only available for patients');
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Face verification failed';
+      navigate('/patient/dashboard');
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Face verification failed';
       setError(message);
       toast.error(message);
     } finally {
@@ -196,8 +198,11 @@ const Login = () => {
           )}
 
           <div className="mt-4 text-center">
-            <Link to="/register" className="text-indigo-600 hover:text-indigo-700">
-              New user? Register here
+            <Link 
+              to={activeTab === 'doctor' ? '/doctor/register' : '/patient/register'} 
+              className="text-indigo-600 hover:text-indigo-700"
+            >
+              New {activeTab}? Register here
             </Link>
           </div>
         </div>

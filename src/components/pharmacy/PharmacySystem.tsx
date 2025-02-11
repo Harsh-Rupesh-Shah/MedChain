@@ -22,8 +22,95 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+const sampleProducts: Product[] = [
+  {
+    _id: '1',
+    name: 'Digital Blood Pressure Monitor',
+    description: 'Accurate and easy-to-use blood pressure monitoring device for home use',
+    category: 'equipment',
+    price: 49.99,
+    image: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?auto=format&fit=crop&q=80&w=300',
+    requiresPrescription: false,
+    manufacturer: 'HealthTech',
+    dosageForm: 'N/A',
+    strength: 'N/A',
+    packSize: '1 unit',
+    stock: 50
+  },
+  {
+    _id: '2',
+    name: 'Premium First Aid Kit',
+    description: 'Comprehensive first aid kit for emergency situations',
+    category: 'equipment',
+    price: 29.99,
+    image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&q=80&w=300',
+    requiresPrescription: false,
+    manufacturer: 'SafetyFirst',
+    dosageForm: 'N/A',
+    strength: 'N/A',
+    packSize: '100 pieces',
+    stock: 100
+  },
+  {
+    _id: '3',
+    name: 'Vitamin D3 Supplements',
+    description: 'High-quality vitamin D3 supplements for bone health',
+    category: 'wellness',
+    price: 15.99,
+    image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&q=80&w=300',
+    requiresPrescription: false,
+    manufacturer: 'VitaHealth',
+    dosageForm: 'Tablets',
+    strength: '1000 IU',
+    packSize: '60 tablets',
+    stock: 200
+  },
+  {
+    _id: '4',
+    name: 'Antibiotics',
+    description: 'Broad-spectrum antibiotic for bacterial infections',
+    category: 'prescription',
+    price: 45.99,
+    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=300',
+    requiresPrescription: true,
+    manufacturer: 'PharmaCare',
+    dosageForm: 'Tablets',
+    strength: '500mg',
+    packSize: '20 tablets',
+    stock: 150
+  },
+  {
+    _id: '5',
+    name: 'Pain Relief Gel',
+    description: 'Fast-acting topical pain relief gel',
+    category: 'otc',
+    price: 12.99,
+    image: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&q=80&w=300',
+    requiresPrescription: false,
+    manufacturer: 'PainAway',
+    dosageForm: 'Gel',
+    strength: '1%',
+    packSize: '100g',
+    stock: 80
+  },
+  {
+    _id: '6',
+    name: 'Digital Thermometer',
+    description: 'Accurate digital thermometer with LCD display',
+    category: 'equipment',
+    price: 19.99,
+    image: 'https://images.unsplash.com/photo-1584017911941-608706237d5c?auto=format&fit=crop&q=80&w=300',
+    requiresPrescription: false,
+    manufacturer: 'TempTech',
+    dosageForm: 'N/A',
+    strength: 'N/A',
+    packSize: '1 unit',
+    stock: 120
+  }
+];
+
 const PharmacySystem = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(sampleProducts);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

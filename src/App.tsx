@@ -8,10 +8,12 @@ import About from './pages/About';
 import Shop from './pages/Shop';
 import Contact from './pages/Contact';
 import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
+import PatientRegister from './pages/auth/PatientRegister';
+import DoctorRegister from './pages/auth/DoctorRegister';
 import SymptomsDetection from './components/SymptomsDetection';
 import DoctorDashboard from './pages/dashboard/DoctorDashboard';
 import PatientDashboard from './pages/dashboard/PatientDashboard';
+import AdminDashboard from './pages/dashboard/AdminDashboard';
 import PrivateRoute from './components/PrivateRoute';
 import './styles/globals.css';
 
@@ -29,7 +31,8 @@ function App() {
             <Route path="/shop" element={<Shop />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/patient/register" element={<PatientRegister />} />
+            <Route path="/doctor/register" element={<DoctorRegister />} />
             <Route path="/symptoms" element={<SymptomsDetection />} />
 
             {/* Doctor Routes */}
@@ -43,6 +46,13 @@ function App() {
             <Route path="/patient/*" element={
               <PrivateRoute allowedRoles={['patient']}>
                 <PatientDashboard />
+              </PrivateRoute>
+            } />
+
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={
+              <PrivateRoute allowedRoles={['admin']}>
+                <AdminDashboard />
               </PrivateRoute>
             } />
 
