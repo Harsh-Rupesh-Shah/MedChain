@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #6366F1;
+  --secondary: #10B981;
+  --accent: #F43F5E;
+  --background: #F8FAFC;
+  --text: #1E293B;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+}
+
+.btn-primary {
+  @apply bg-indigo-500 text-white px-6 py-2 rounded-lg hover:bg-indigo-600 transition-all transform hover:scale-105 shadow-md;
+}
+
+.btn-secondary {
+  @apply bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-all transform hover:scale-105 shadow-md;
+}
+
+.nav-link {
+  @apply text-slate-700 hover:text-indigo-500 transition-colors font-medium;
+}
+
+.card {
+  @apply bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow;
+}
+
+.input-field {
+  @apply w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/50 backdrop-blur-sm;
+}
+
+.section-title {
+  @apply text-3xl font-bold text-slate-800 mb-6;
+}
+
+.container-custom {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Hero Section Styles */
+.hero {
+  @apply bg-gradient-to-br from-indigo-600 via-indigo-500 to-emerald-500 text-white;
+}
+
+/* Features Section Styles */
+.feature-card {
+  @apply bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg transition-all hover:scale-105 hover:shadow-xl border border-slate-100;
+}
+
+/* Authentication Forms */
+.auth-form {
+  @apply max-w-md mx-auto bg-white/90 backdrop-blur-sm p-8 rounded-xl shadow-xl border border-slate-100;
+}
+
+/* Shop Items */
+.shop-item {
+  @apply bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:scale-105 hover:shadow-xl border border-slate-100;
+}
+
+/* Blog Cards */
+.blog-card {
+  @apply bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow border border-slate-100;
+}
+
+/* Loading States */
+.loading {
+  @apply animate-pulse bg-slate-200;
+}
+
+/* Responsive Navigation */
+.mobile-nav {
+  @apply md:hidden fixed inset-0 bg-white/90 backdrop-blur-md z-50 transform transition-transform duration-300;
+}
+
+/* Glass Effect */
+.glass {
+  @apply bg-white/70 backdrop-blur-md border border-white/20;
+}
+
+/* Authentication Tabs */
+.auth-tab {
+  @apply px-6 py-3 text-center cursor-pointer transition-colors;
+}
+
+.auth-tab.active {
+  @apply border-b-2 border-indigo-500 text-indigo-500 font-semibold;
+}
+
+/* Camera Preview */
+.camera-preview {
+  @apply rounded-lg overflow-hidden shadow-lg border-4 border-indigo-500;
+}
+
+/* ID Scanner */
+.id-scanner {
+  @apply rounded-lg overflow-hidden shadow-lg border-4 border-emerald-500;
+}
