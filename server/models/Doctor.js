@@ -71,5 +71,4 @@ const doctorSchema = new mongoose.Schema({
 
 doctorSchema.index({ 'location.coordinates': '2dsphere' });
 
-const Doctor = mongoose.model('Doctor', doctorSchema);
-export default Doctor;
+export default doctorSchema;

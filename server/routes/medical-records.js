@@ -1,6 +1,6 @@
 import express from 'express';
-import { auth, checkRole } from '../middleware/auth.js';
-import { MedicalRecord, User } from '../models/index.js';
+import { auth } from '../middleware/auth.js';
+import { MedicalRecord, Doctor } from '../models/index.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -31,61 +31,68 @@ const upload = multer({
   }
 });
 
-// Get medical records for a patient
-router.get('/patient/:patientId', auth, async (req, res) => {
-  try {
-    // Check authorization
-    if (req.user.role === 'patient' && req.user.userId !== req.params.patientId) {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
-
-    const records = await MedicalRecord.find({ patient: req.params.patientId })
-      .populate('doctor', 'name')
-      .sort({ date: -1 });
-
-    res.json(records);
-  } catch (error) {
-    console.error('Get medical records error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
 // Add new medical record
 router.post('/', auth, upload.array('attachments'), async (req, res) => {
-  try {
-    const { type, title, date, description, patientId } = req.body;
-
-    // Check authorization for patient records
-    if (req.user.role === 'patient' && req.user.userId !== patientId) {
-      return res.status(403).json({ message: 'Not authorized' });
+    try {
+      const { type, title, date, description } = req.body;
+  
+      const attachments = req.files?.map(file => ({
+        filename: file.filename,
+        originalName: file.originalname,
+        path: file.path,
+        mimetype: file.mimetype
+      })) || [];
+  
+      // Create base record data
+      const recordData = {
+        patient: req.user.userId,
+        type,
+        title,
+        date,
+        description,
+        attachments
+      };
+  
+      // If the user is a doctor, add their ID as the doctor field
+      if (req.user.role === 'doctor') {
+        const doctor = await Doctor.findOne({ user: req.user.userId });
+        if (doctor) {
+          recordData.doctor = doctor._id;
+        }
+      }
+  
+      const record = new MedicalRecord(recordData);
+      await record.save();
+  
+      // Populate doctor info before sending response
+      const populatedRecord = await MedicalRecord.findById(record._id)
+        .populate('doctor', 'name');
+  
+      res.status(201).json(populatedRecord);
+    } catch (error) {
+      console.error('Add medical record error:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    const attachments = req.files?.map(file => ({
-      filename: file.filename,
-      originalName: file.originalname,
-      path: file.path,
-      mimetype: file.mimetype
-    })) || [];
-
-    const record = new MedicalRecord({
-      patient: patientId,
-      doctor: req.user.role === 'doctor' ? req.user.userId : undefined,
-      type,
-      title,
-      date,
-      description,
-      attachments
-    });
-
-    await record.save();
-
-    res.status(201).json(record);
-  } catch (error) {
-    console.error('Add medical record error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
+  });
+  
+  // Get medical records for a patient
+  router.get('/patient/:patientId', auth, async (req, res) => {
+    try {
+      // Check authorization
+      if (req.user.role === 'patient' && req.user.userId !== req.params.patientId) {
+        return res.status(403).json({ message: 'Not authorized' });
+      }
+  
+      const records = await MedicalRecord.find({ patient: req.params.patientId })
+        .populate('doctor', 'name')
+        .sort({ date: -1 });
+  
+      res.json(records);
+    } catch (error) {
+      console.error('Get medical records error:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 // Download attachment
 router.get('/:recordId/attachments/:filename', auth, async (req, res) => {
   try {
@@ -135,7 +142,7 @@ router.delete('/:id', auth, async (req, res) => {
       }
     }
 
-    await record.remove();
+    await record.deleteOne();
     res.json({ message: 'Record deleted successfully' });
   } catch (error) {
     console.error('Delete medical record error:', error);

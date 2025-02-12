@@ -9,8 +9,9 @@ import patientRoutes from './routes/patients.js';
 import appointmentRoutes from './routes/appointments.js';
 import messageRoutes from './routes/messages.js';
 import pharmacyRoutes from './routes/pharmacy.js';
+import medicalRecordsRoutes from './routes/medical-records.js';
 import initializeSocket from './socket.js';
-import adminRoutes from './routes/admin.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -24,6 +25,9 @@ const io = initializeSocket(httpServer);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Make uploads directory accessible
+app.use('/uploads', express.static('uploads'));
 
 // Database connection with proper error handling
 mongoose.connect(process.env.MONGODB_URI)
@@ -42,7 +46,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/medical-records', medicalRecordsRoutes); // Add this line
 
 // Error handling middleware
 app.use((err, req, res, next) => {
