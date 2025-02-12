@@ -1,4 +1,3 @@
-// Update the Doctor model to include idCardImage field
 import mongoose from 'mongoose';
 
 const doctorSchema = new mongoose.Schema({
@@ -17,8 +16,7 @@ const doctorSchema = new mongoose.Schema({
   },
   licenseNumber: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   experience: {
     type: Number,

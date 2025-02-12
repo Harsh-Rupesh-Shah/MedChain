@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Phone, Calendar } from 'lucide-react';
+import { User, Mail, Lock, Phone, Calendar, Camera, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../services/api';
 
@@ -8,6 +8,8 @@ const PatientRegister = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,7 +17,8 @@ const PatientRegister = () => {
     confirmPassword: '',
     phone: '',
     dateOfBirth: '',
-    gender: 'male'
+    gender: 'male',
+    faceImage: null as File | null
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -23,6 +26,47 @@ const PatientRegister = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size should be less than 5MB');
+        return;
+      }
+
+      setFormData({
+        ...formData,
+        faceImage: file
+      });
+
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImage = () => {
+    setImagePreview(null);
+    setFormData({
+      ...formData,
+      faceImage: null
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,9 +78,21 @@ const PatientRegister = () => {
       return;
     }
 
+    if (!formData.faceImage) {
+      setError('Please upload your face image');
+      return;
+    }
+
     try {
       setLoading(true);
-      await api.post('/auth/patient/register', formData);
+      const formDataObj = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key !== 'confirmPassword' && value !== null) {
+          formDataObj.append(key, value);
+        }
+      });
+
+      await api.post('/auth/patient/register', formDataObj);
       toast.success('Registration successful! Please login.');
       navigate('/login');
     } catch (err: any) {
@@ -184,6 +240,47 @@ const PatientRegister = () => {
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Face Image
+              </label>
+              <div className="mt-2">
+                <div
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera className="h-8 w-8 mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm text-slate-600">
+                    Click to upload or drag and drop your face image
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+
+                {imagePreview && (
+                  <div className="mt-4 relative">
+                    <img
+                      src={imagePreview}
+                      alt="Face Preview"
+                      className="max-w-full h-auto rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearImage}
+                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
