@@ -396,7 +396,6 @@ router.post('/admin/login',
 router.get('/me', auth, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
-      // For admin, return the user object directly
       return res.json({
         _id: req.user.userId,
         email: req.user.email,
@@ -405,16 +404,28 @@ router.get('/me', auth, async (req, res) => {
       });
     }
 
-    // For regular users, fetch from database
     const user = await User.findById(req.user.userId)
-      .select('-password')
-      .populate('profile');
-    
+      .select('-password');
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json(user);
+    // Get profile data based on role
+    let profile;
+    if (user.role === 'doctor') {
+      profile = await Doctor.findOne({ user: user._id });
+    } else if (user.role === 'patient') {
+      profile = await Patient.findOne({ user: user._id });
+    }
+
+    res.json({
+      _id: user._id,
+      email: user.email,
+      role: user.role,
+      name: profile?.name,
+      profile: profile
+    });
   } catch (err) {
     console.error('Get current user error:', err);
     res.status(500).json({ message: 'Server error' });

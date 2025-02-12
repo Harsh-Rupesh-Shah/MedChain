@@ -37,6 +37,19 @@ const upload = multer({
 });
 
 // Get all patients for doctor
+router.get('/patients/:patientId/records', auth, checkRole(['doctor']), async (req, res) => {
+  try {
+    const records = await MedicalRecord.find({ patient: req.params.patientId })
+      .populate('doctor', 'name')
+      .sort({ date: -1 });
+    res.json(records);
+  } catch (error) {
+    console.error('Get patient records error:', error);
+    res.status(500).json({ message: 'Error fetching medical records' });
+  }
+});
+
+// Get all patients for doctor
 router.get('/patients', auth, checkRole(['doctor']), async (req, res) => {
   try {
     // Find all users with role 'patient'

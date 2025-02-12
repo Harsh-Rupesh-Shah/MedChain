@@ -21,7 +21,8 @@ const medicalRecordSchema = new mongoose.Schema({
   },
   doctor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Doctor'
+    ref: 'Doctor',
+    required: false
   },
   description: String,
   attachments: [{
@@ -41,4 +42,4 @@ const medicalRecordSchema = new mongoose.Schema({
   }
 });
 
-export default mongoose.model('MedicalRecord', medicalRecordSchema);
+export default medicalRecordSchema;

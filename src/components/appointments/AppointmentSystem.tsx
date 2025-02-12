@@ -38,7 +38,10 @@ const AppointmentSystem = () => {
   const [newAppointment, setNewAppointment] = useState({
     doctorId: '',
     date: new Date().toISOString().split('T')[0],
-    time: '',
+    timeSlot: {
+      startTime: '',
+      endTime: ''
+    },
     type: 'in-person' as 'in-person' | 'video',
     notes: ''
   });
@@ -71,6 +74,11 @@ const AppointmentSystem = () => {
 
   const handleSchedule = async () => {
     try {
+      if (!newAppointment.doctorId || !newAppointment.timeSlot.startTime) {
+        toast.error('Please select a doctor and time slot');
+        return;
+      }
+
       setLoading(true);
       await api.post('/appointments', newAppointment);
       toast.success('Appointment scheduled successfully');
@@ -79,7 +87,10 @@ const AppointmentSystem = () => {
       setNewAppointment({
         doctorId: '',
         date: new Date().toISOString().split('T')[0],
-        time: '',
+        timeSlot: {
+          startTime: '',
+          endTime: ''
+        },
         type: 'in-person',
         notes: ''
       });
@@ -101,11 +112,15 @@ const AppointmentSystem = () => {
   };
 
   const getAvailableSlots = () => {
-    if (!selectedDoctor) return [];
-    const doctor = doctors.find(d => d._id === selectedDoctor);
+    if (!selectedDoctor || !newAppointment.date) return [];
+    
+    const doctor = doctors.find(d => d._id === newAppointment.doctorId);
     if (!doctor) return [];
 
-    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'monday' }).toLowerCase();
+    const dayOfWeek = new Date(newAppointment.date)
+      .toLocaleDateString('en-US', { weekday: 'monday' })
+      .toLowerCase();
+      
     const availability = doctor.availability.find(a => a.day === dayOfWeek);
     return availability?.slots.filter(slot => !slot.isBooked) || [];
   };
@@ -234,12 +249,15 @@ const AppointmentSystem = () => {
                     <button
                       key={index}
                       type="button"
-                      onClick={() => setNewAppointment({ 
-                        ...newAppointment, 
-                        time: `${slot.startTime}-${slot.endTime}` 
+                      onClick={() => setNewAppointment({
+                        ...newAppointment,
+                        timeSlot: {
+                          startTime: slot.startTime,
+                          endTime: slot.endTime
+                        }
                       })}
                       className={`p-2 rounded-lg border text-sm ${
-                        newAppointment.time === `${slot.startTime}-${slot.endTime}`
+                        newAppointment.timeSlot.startTime === slot.startTime
                           ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                           : 'border-slate-200 hover:border-indigo-500'
                       }`}
@@ -294,7 +312,7 @@ const AppointmentSystem = () => {
 
               <button
                 onClick={handleSchedule}
-                disabled={loading || !newAppointment.doctorId || !newAppointment.time}
+                disabled={loading || !newAppointment.doctorId || !newAppointment.timeSlot.startTime}
                 className="btn-primary w-full"
               >
                 {loading ? 'Scheduling...' : 'Schedule Appointment'}

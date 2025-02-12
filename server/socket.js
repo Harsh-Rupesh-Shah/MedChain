@@ -1,6 +1,6 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import Message from './models/Message.js';
+import { Message } from './models/index.js';
 
 const initializeSocket = (server) => {
   const io = new Server(server, {
@@ -8,7 +8,8 @@ const initializeSocket = (server) => {
       origin: process.env.CLIENT_URL || 'http://localhost:5173',
       methods: ['GET', 'POST'],
       credentials: true
-    }
+    },
+    path: '/socket.io'
   });
 
   // Socket authentication middleware
@@ -27,54 +28,38 @@ const initializeSocket = (server) => {
     }
   });
 
-  const userSockets = new Map();
-
   io.on('connection', (socket) => {
-    const userId = socket.user.userId;
-    userSockets.set(userId, socket.id);
+    console.log('User connected:', socket.user.userId);
 
-    // Join private room
-    socket.join(`user_${userId}`);
+    // Join user's room
+    socket.join(`user_${socket.user.userId}`);
 
-    // Handle private messages
     socket.on('private_message', async (data) => {
       try {
         const message = new Message({
-          sender: userId,
+          sender: socket.user.userId,
           receiver: data.receiverId,
-          content: data.content,
-          attachments: data.attachments || []
+          content: data.content
         });
-        await message.save();
 
+        await message.save();
         const populatedMessage = await Message.findById(message._id)
           .populate('sender', 'name role')
           .populate('receiver', 'name role');
 
-        // Send to receiver if online
-        const receiverSocketId = userSockets.get(data.receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit('private_message', populatedMessage);
-        }
-
+        // Send to receiver's room
+        io.to(`user_${data.receiverId}`).emit('new_message', populatedMessage);
+        
         // Send back to sender
-        socket.emit('private_message', populatedMessage);
-      } catch (err) {
+        socket.emit('new_message', populatedMessage);
+      } catch (error) {
+        console.error('Socket message error:', error);
         socket.emit('error', { message: 'Failed to send message' });
       }
     });
 
-    // Handle typing status
-    socket.on('typing', (data) => {
-      const receiverSocketId = userSockets.get(data.receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('typing', { userId });
-      }
-    });
-
-    // Handle disconnect
     socket.on('disconnect', () => {
-      userSockets.delete(userId);
+      console.log('User disconnected:', socket.user.userId);
     });
   });
 
