@@ -7,14 +7,14 @@ import { toast } from 'react-hot-toast';
 interface User {
   _id: string;
   email: string;
-  role: 'patient' | 'doctor';
+  role: 'patient' | 'doctor' | 'admin';
   name: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, role: 'patient' | 'doctor' | 'admin') => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
   verifyFace: (image: File) => Promise<void>;
@@ -48,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Auth check error:', error);
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       disconnectSocket();
     } finally {
       setLoading(false);
@@ -68,18 +69,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, role: 'patient' | 'doctor' | 'admin') => {
     try {
       setLoading(true);
-      const response = await auth.login({ email, password });
+      const response = await auth.login({ email, password }, role);
       const { token, user } = response.data;
 
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       connectSocket();
 
       toast.success('Login successful!');
-      navigate(user.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard');
+      
+      // Navigate based on role
+      switch (user.role) {
+        case 'doctor':
+          navigate('/doctor/dashboard', { replace: true });
+          break;
+        case 'patient':
+          navigate('/patient/dashboard', { replace: true });
+          break;
+        case 'admin':
+          navigate('/admin/dashboard', { replace: true });
+          break;
+      }
     } catch (error) {
       throw error;
     } finally {
@@ -89,9 +103,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
     disconnectSocket();
-    navigate('/login');
+    navigate('/login', { replace: true });
     toast.success('Logged out successfully');
   };
 
@@ -102,10 +117,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { token, user } = response.data;
 
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       connectSocket();
 
-      navigate('/patient/dashboard');
+      navigate('/patient/dashboard', { replace: true });
       toast.success('Face verification successful!');
     } catch (error) {
       throw error;
@@ -151,3 +167,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default useAuth;

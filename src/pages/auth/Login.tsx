@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { User, Lock, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import FaceRecognition from '../../components/FaceRecognition';
-import api from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
 const Login = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
+  const { login } = useAuth();
+  const [activeTab, setActiveTab] = useState<'patient' | 'doctor' | 'admin'>('patient');
   const [loginMethod, setLoginMethod] = useState<'face' | 'credentials'>('credentials');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,30 +28,9 @@ const Login = () => {
     try {
       setLoading(true);
       setError('');
-
-      const endpoint = activeTab === 'doctor' ? '/auth/doctor/login' : '/auth/patient/login';
-      const response = await api.post(endpoint, formData);
-      
-      const { token, user } = response.data;
-      
-      // Store token and user data
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      toast.success('Login successful!');
-      
-      // Immediate redirect based on role
-      console.log('User role:', user.role); // Debug log
-      
-      if (user.role === 'doctor') {
-        navigate('/doctor/dashboard', { replace: true });
-      } else if (user.role === 'patient') {
-        navigate('/patient/dashboard', { replace: true });
-      } else if (user.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      }
+      await login(formData.email, formData.password, activeTab);
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Login failed';
+      const message = err.message || 'Login failed';
       setError(message);
       toast.error(message);
     } finally {
@@ -63,26 +42,10 @@ const Login = () => {
     try {
       setLoading(true);
       setError('');
-
-      const formData = new FormData();
-      formData.append('face', image);
-
-      const response = await api.post('/auth/patient/face-login', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      const { token, user } = response.data;
-      
-      // Store token and user data
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      toast.success('Face verification successful!');
-      navigate('/patient/dashboard', { replace: true });
+      const { verifyFace } = useAuth();
+      await verifyFace(image);
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Face verification failed';
+      const message = err.message || 'Face verification failed';
       setError(message);
       toast.error(message);
     } finally {
@@ -112,6 +75,15 @@ const Login = () => {
               }}
             >
               Doctor Login
+            </button>
+            <button
+              className={`auth-tab flex-1 ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('admin');
+                setLoginMethod('credentials');
+              }}
+            >
+              Admin Login
             </button>
           </div>
 
@@ -149,7 +121,7 @@ const Login = () => {
             </div>
           )}
 
-          {(activeTab === 'doctor' || (activeTab === 'patient' && loginMethod === 'credentials')) && (
+          {(activeTab !== 'patient' || (activeTab === 'patient' && loginMethod === 'credentials')) && (
             <form onSubmit={handleCredentialsLogin}>
               <div className="space-y-4">
                 <div>
@@ -203,14 +175,16 @@ const Login = () => {
             <FaceRecognition onCapture={handleFaceLogin} mode="verify" />
           )}
 
-          <div className="mt-4 text-center">
-            <Link 
-              to={activeTab === 'doctor' ? '/doctor/register' : '/patient/register'} 
-              className="text-indigo-600 hover:text-indigo-700"
-            >
-              New {activeTab}? Register here
-            </Link>
-          </div>
+          {activeTab !== 'admin' && (
+            <div className="mt-4 text-center">
+              <Link 
+                to={activeTab === 'doctor' ? '/doctor/register' : '/patient/register'} 
+                className="text-indigo-600 hover:text-indigo-700"
+              >
+                New {activeTab}? Register here
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

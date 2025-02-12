@@ -34,7 +34,8 @@ api.interceptors.response.use(
       // Server responded with error
       errorMessage = error.response.data?.message || 'Server error';
       
-      if (error.response.status === 401) {
+      // Only redirect to login for 401 errors if not already on the login page
+      if (error.response.status === 401 && !window.location.pathname.includes('/login')) {
         localStorage.removeItem('token');
         window.location.href = '/login';
         errorMessage = 'Session expired. Please login again.';
@@ -60,13 +61,17 @@ export const auth = {
     }
   },
   
-  login: async (data: any) => {
+  login: async (data: any, role: 'patient' | 'doctor' | 'admin') => {
     try {
-      const response = await api.post('/auth/login', data);
+      const endpoint = `/auth/${role}/login`;
+      const response = await api.post(endpoint, data);
       
       if (!response.data?.token || !response.data?.user) {
         throw new Error('Invalid response from server');
       }
+      
+      // Ensure the user object has the correct role
+      response.data.user.role = role;
       
       return response;
     } catch (error) {
