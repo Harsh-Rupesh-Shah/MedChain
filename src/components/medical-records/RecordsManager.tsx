@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Upload, Download, Trash2, Search, Plus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../services/api';
@@ -18,6 +18,8 @@ const RecordsManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newRecord, setNewRecord] = useState({
     type: 'prescription' as MedicalRecord['type'],
     title: '',
@@ -43,10 +45,33 @@ const RecordsManager = () => {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...files]);
+    }
+  };
+
   const handleAddRecord = async () => {
     try {
       setLoading(true);
-      await api.post('/patients/records', newRecord);
+      const formData = new FormData();
+      formData.append('type', newRecord.type);
+      formData.append('title', newRecord.title);
+      formData.append('date', newRecord.date);
+      formData.append('doctor', newRecord.doctor);
+      formData.append('description', newRecord.description);
+
+      selectedFiles.forEach(file => {
+        formData.append('attachments', file);
+      });
+
+      await api.post('/patients/records', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
       toast.success('Medical record added successfully');
       setShowAddModal(false);
       loadRecords();
@@ -58,6 +83,7 @@ const RecordsManager = () => {
         description: '',
         attachments: []
       });
+      setSelectedFiles([]);
     } catch (error) {
       toast.error('Failed to add medical record');
     } finally {
@@ -73,6 +99,14 @@ const RecordsManager = () => {
     } catch (error) {
       toast.error('Failed to delete record');
     }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
   };
 
   const filteredRecords = records.filter(record =>
@@ -234,12 +268,37 @@ const RecordsManager = () => {
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Attachments
                 </label>
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+                <div 
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer"
+                  onClick={handleBrowseClick}
+                >
                   <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
                   <p className="text-sm text-slate-600">
-                    Drag and drop files here or click to browse
+                    Click to browse or drag and drop files here
                   </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                 </div>
+                {selectedFiles.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between bg-slate-50 p-2 rounded">
+                        <span className="text-sm text-slate-600">{file.name}</span>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button

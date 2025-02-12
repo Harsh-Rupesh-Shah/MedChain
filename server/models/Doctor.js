@@ -16,11 +16,14 @@ const doctorSchema = new mongoose.Schema({
   },
   licenseNumber: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   experience: {
     type: Number,
+    required: true
+  },
+  idCardImage: {
+    type: String,
     required: true
   },
   location: {
@@ -29,8 +32,14 @@ const doctorSchema = new mongoose.Schema({
     state: String,
     country: String,
     coordinates: {
-      type: { type: String, default: 'Point' },
-      coordinates: [Number]
+      type: {
+        type: String,
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number],
+        default: [0, 0]
+      }
     }
   },
   availability: [{

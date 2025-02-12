@@ -38,6 +38,8 @@ const upload = multer({
 
 // Verify doctor ID card
 router.post('/verify-id', upload.single('idCard'), async (req, res) => {
+  console.log('Verify ID request received:', req.file); // Debugging line
+
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No ID card image provided' });

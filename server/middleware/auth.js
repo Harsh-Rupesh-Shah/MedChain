@@ -10,6 +10,18 @@ export const auth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Handle admin authentication differently
+    if (decoded.role === 'admin') {
+      req.user = {
+        userId: decoded.userId,
+        role: 'admin',
+        email: decoded.email
+      };
+      return next();
+    }
+
+    // For regular users, verify against database
     const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {

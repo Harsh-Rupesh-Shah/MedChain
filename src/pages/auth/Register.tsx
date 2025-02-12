@@ -79,40 +79,61 @@ const Register = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  // Update the handleSubmit function to handle file upload directly
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
 
-    try {
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error('Passwords do not match');
-      }
-
-      if (formData.password.length < 6) {
-        throw new Error('Password must be at least 6 characters long');
-      }
-
-      if (!formData.biometricData) {
-        throw new Error(`Please ${formData.role === 'doctor' ? 'upload your ID card' : 'register your face'} before continuing`);
-      }
-
-      // Register user
-      await register({
-        ...formData,
-        biometricData: formData.biometricData
-      });
-
-      toast.success('Registration successful! Please login.');
-      navigate('/login');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Registration failed';
-      toast.error(message);
-      setError(message);
-    } finally {
-      setLoading(false);
+  try {
+    if (formData.password !== formData.confirmPassword) {
+      throw new Error('Passwords do not match');
     }
-  };
+
+    if (formData.password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
+    if (formData.role === 'doctor' && !formData.biometricData) {
+      throw new Error('Please upload your ID card before continuing');
+    }
+
+    // Create FormData for file upload
+    const formDataObj = new FormData();
+    Object.keys(formData).forEach(key => {
+      if (key !== 'biometricData' && key !== 'confirmPassword') {
+        formDataObj.append(key, formData[key]);
+      }
+    });
+
+    if (formData.role === 'doctor' && formData.biometricData) {
+      formDataObj.append('idCardImage', formData.biometricData);
+    }
+
+    // Register user
+    const response = await api.post('/auth/register', formDataObj, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    if (response.data.user.role === 'doctor') {
+      toast.success('Registration successful! Please wait for admin verification before logging in.');
+    } else {
+      toast.success('Registration successful! Please login.');
+    }
+    
+    navigate('/login');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Registration failed';
+    toast.error(message);
+    setError(message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   return (
     <div className="min-h-screen py-12 bg-gradient-to-br from-indigo-50 to-emerald-50">

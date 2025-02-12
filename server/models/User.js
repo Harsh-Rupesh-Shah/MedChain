@@ -26,6 +26,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  faceData: {
+    descriptors: [[Number]],
+    lastUpdated: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now
