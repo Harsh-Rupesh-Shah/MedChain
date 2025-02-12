@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../hooks/useAuth';
 
 interface Profile {
   name: string;
@@ -18,6 +19,9 @@ interface Profile {
     relationship: string;
     phone: string;
   };
+  specialization?: string; // For doctors only
+  licenseNumber?: string; // For doctors only
+  experience?: number; // For doctors only
 }
 
 const defaultProfile: Profile = {
@@ -38,6 +42,7 @@ const defaultProfile: Profile = {
 };
 
 const ProfileSection = () => {
+  const { user } = useAuth();
   const [profile, setProfile] = useState<Profile>(defaultProfile);
   const [editedProfile, setEditedProfile] = useState<Profile>(defaultProfile);
   const [editing, setEditing] = useState(false);
@@ -50,7 +55,8 @@ const ProfileSection = () => {
   const loadProfile = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/patients/profile');
+      const endpoint = user?.role === 'doctor' ? '/doctors/profile' : '/patients/profile';
+      const response = await api.get(endpoint);
       const profileData = response.data || defaultProfile;
       setProfile(profileData);
       setEditedProfile(profileData);
@@ -66,7 +72,8 @@ const ProfileSection = () => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const response = await api.put('/patients/profile', editedProfile);
+      const endpoint = user?.role === 'doctor' ? '/doctors/profile' : '/patients/profile';
+      const response = await api.put(endpoint, editedProfile);
       setProfile(response.data);
       setEditing(false);
       toast.success('Profile updated successfully');
@@ -184,6 +191,59 @@ const ProfileSection = () => {
                 <p className="text-slate-900">{profile.address || 'Not set'}</p>
               )}
             </div>
+
+            {user?.role === 'doctor' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Specialization
+                  </label>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={editedProfile.specialization}
+                      onChange={(e) => setEditedProfile({ ...editedProfile, specialization: e.target.value })}
+                      className="input-field"
+                    />
+                  ) : (
+                    <p className="text-slate-900">{profile.specialization || 'Not set'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    License Number
+                  </label>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={editedProfile.licenseNumber}
+                      onChange={(e) => setEditedProfile({ ...editedProfile, licenseNumber: e.target.value })}
+                      className="input-field"
+                    />
+                  ) : (
+                    <p className="text-slate-900">{profile.licenseNumber || 'Not set'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Years of Experience
+                  </label>
+                  {editing ? (
+                    <input
+                      type="number"
+                      value={editedProfile.experience}
+                      onChange={(e) => setEditedProfile({ ...editedProfile, experience: parseInt(e.target.value) })}
+                      className="input-field"
+                      min="0"
+                    />
+                  ) : (
+                    <p className="text-slate-900">{profile.experience ? `${profile.experience} years` : 'Not set'}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Medical Information */}
@@ -252,45 +312,49 @@ const ProfileSection = () => {
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Allergies
-              </label>
-              {editing ? (
-                <input
-                  type="text"
-                  value={editedProfile.allergies.join(', ')}
-                  onChange={(e) => setEditedProfile({ 
-                    ...editedProfile, 
-                    allergies: e.target.value.split(',').map(item => item.trim()) 
-                  })}
-                  className="input-field"
-                  placeholder="Separate allergies with commas"
-                />
-              ) : (
-                <p className="text-slate-900">{profile.allergies.length > 0 ? profile.allergies.join(', ') : 'None'}</p>
-              )}
-            </div>
+            {user?.role === 'patient' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Allergies
+                  </label>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={editedProfile.allergies.join(', ')}
+                      onChange={(e) => setEditedProfile({ 
+                        ...editedProfile, 
+                        allergies: e.target.value.split(',').map(item => item.trim()) 
+                      })}
+                      className="input-field"
+                      placeholder="Separate allergies with commas"
+                    />
+                  ) : (
+                    <p className="text-slate-900">{profile.allergies.length > 0 ? profile.allergies.join(', ') : 'None'}</p>
+                  )}
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Chronic Conditions
-              </label>
-              {editing ? (
-                <input
-                  type="text"
-                  value={editedProfile.chronicConditions.join(', ')}
-                  onChange={(e) => setEditedProfile({ 
-                    ...editedProfile, 
-                    chronicConditions: e.target.value.split(',').map(item => item.trim()) 
-                  })}
-                  className="input-field"
-                  placeholder="Separate conditions with commas"
-                />
-              ) : (
-                <p className="text-slate-900">{profile.chronicConditions.length > 0 ? profile.chronicConditions.join(', ') : 'None'}</p>
-              )}
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Chronic Conditions
+                  </label>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={editedProfile.chronicConditions.join(', ')}
+                      onChange={(e) => setEditedProfile({ 
+                        ...editedProfile, 
+                        chronicConditions: e.target.value.split(',').map(item => item.trim()) 
+                      })}
+                      className="input-field"
+                      placeholder="Separate conditions with commas"
+                    />
+                  ) : (
+                    <p className="text-slate-900">{profile.chronicConditions.length > 0 ? profile.chronicConditions.join(', ') : 'None'}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
 

@@ -31,10 +31,6 @@ const userSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
-  faceData: {
-    descriptors: [[Number]],
-    lastUpdated: Date
-  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -51,4 +47,4 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-export default mongoose.model('User', userSchema);
+export default userSchema;

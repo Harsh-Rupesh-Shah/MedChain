@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Image } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { socket } from '../../services/socket';
+import { toast } from 'react-hot-toast';
+import api from '../../services/api';
 
 interface Message {
   _id: string;
@@ -36,36 +38,41 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
   const [isTyping, setIsTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadChatHistory();
-    socket.on('private_message', handleNewMessage);
+    socket.on('new_message', handleNewMessage);
     socket.on('typing', handleTypingStatus);
 
     return () => {
-      socket.off('private_message');
+      socket.off('new_message');
       socket.off('typing');
     };
   }, [receiverId]);
 
   const loadChatHistory = async () => {
     try {
-      const response = await fetch(`/api/chat/${receiverId}`, {
-        headers: {
-          'x-auth-token': localStorage.getItem('token') || ''
-        }
-      });
-      const data = await response.json();
-      setMessages(data);
+      setLoading(true);
+      const response = await api.get(`/messages/${receiverId}`);
+      setMessages(response.data);
       scrollToBottom();
-    } catch (err) {
-      console.error('Failed to load chat history:', err);
+      markMessagesAsRead();
+    } catch (error) {
+      toast.error('Failed to load chat history');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleNewMessage = (message: Message) => {
-    setMessages(prev => [...prev, message]);
-    scrollToBottom();
+    if (message.sender._id === receiverId || message.receiver._id === receiverId) {
+      setMessages(prev => [...prev, message]);
+      scrollToBottom();
+      if (message.sender._id === receiverId) {
+        markMessagesAsRead();
+      }
+    }
   };
 
   const handleTypingStatus = (data: { userId: string }) => {
@@ -75,19 +82,33 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
     }
   };
 
+  const markMessagesAsRead = async () => {
+    try {
+      await api.put(`/messages/read/${receiverId}`);
+    } catch (error) {
+      console.error('Failed to mark messages as read:', error);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!newMessage.trim()) return;
 
-    socket.emit('private_message', {
-      receiverId,
-      content: newMessage
-    });
+    try {
+      const response = await api.post('/messages', {
+        receiverId,
+        content: newMessage
+      });
 
-    setNewMessage('');
+      setMessages(prev => [...prev, response.data]);
+      setNewMessage('');
+      scrollToBottom();
+    } catch (error) {
+      toast.error('Failed to send message');
+    }
   };
 
   const handleTyping = () => {
@@ -101,6 +122,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
       socket.emit('stop_typing', { receiverId });
     }, 3000));
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[600px] bg-white rounded-lg shadow-lg">

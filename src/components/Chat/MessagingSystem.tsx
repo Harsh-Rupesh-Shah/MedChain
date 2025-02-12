@@ -3,42 +3,26 @@ import { useAuth } from '../../hooks/useAuth';
 import { Search, Send, Paperclip, Image } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { socket } from '../../services/socket';
 
-interface Conversation {
-  user: {
-    _id: string;
-    name: string;
-    role: string;
-  };
-  lastMessage: {
-    content: string;
-    createdAt: string;
-    read: boolean;
-  };
+interface User {
+  _id: string;
+  name: string;
+  role: string;
 }
 
 interface Message {
   _id: string;
   content: string;
-  sender: {
-    _id: string;
-    name: string;
-  };
-  receiver: {
-    _id: string;
-    name: string;
-  };
-  attachments: Array<{
-    type: string;
-    url: string;
-  }>;
+  sender: User;
+  receiver: User;
   createdAt: string;
   read: boolean;
 }
 
 const MessagingSystem = () => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -46,7 +30,13 @@ const MessagingSystem = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    loadConversations();
+    loadAvailableUsers();
+    setupSocketListeners();
+
+    return () => {
+      socket.off('new_message');
+      socket.off('message_read');
+    };
   }, []);
 
   useEffect(() => {
@@ -55,13 +45,34 @@ const MessagingSystem = () => {
     }
   }, [selectedUser]);
 
-  const loadConversations = async () => {
+  const setupSocketListeners = () => {
+    socket.on('new_message', (message: Message) => {
+      if (
+        message.sender._id === selectedUser || 
+        message.receiver._id === selectedUser
+      ) {
+        setMessages(prev => [...prev, message]);
+      }
+    });
+
+    socket.on('message_read', ({ messageIds }) => {
+      setMessages(prev => 
+        prev.map(msg => 
+          messageIds.includes(msg._id) ? { ...msg, read: true } : msg
+        )
+      );
+    });
+  };
+
+  const loadAvailableUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/messages/conversations');
-      setConversations(response.data);
+      // Load doctors for patients, and patients for doctors
+      const endpoint = user?.role === 'patient' ? '/doctors' : '/doctors/patients';
+      const response = await api.get(endpoint);
+      setAvailableUsers(response.data);
     } catch (error) {
-      toast.error('Failed to load conversations');
+      toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -71,9 +82,17 @@ const MessagingSystem = () => {
     try {
       const response = await api.get(`/messages/${userId}`);
       setMessages(response.data);
-      markAsRead(userId);
+      markMessagesAsRead(userId);
     } catch (error) {
       toast.error('Failed to load messages');
+    }
+  };
+
+  const markMessagesAsRead = async (userId: string) => {
+    try {
+      await api.put(`/messages/read/${userId}`);
+    } catch (error) {
+      console.error('Failed to mark messages as read:', error);
     }
   };
 
@@ -83,39 +102,35 @@ const MessagingSystem = () => {
     try {
       const response = await api.post('/messages', {
         receiverId: selectedUser,
-        content: newMessage
+        content: newMessage.trim()
       });
 
       setMessages(prev => [...prev, response.data]);
       setNewMessage('');
-      loadConversations(); // Refresh conversations list
+      
+      // Emit socket event
+      socket.emit('private_message', {
+        receiverId: selectedUser,
+        content: newMessage.trim()
+      });
     } catch (error) {
       toast.error('Failed to send message');
     }
   };
 
-  const markAsRead = async (userId: string) => {
-    try {
-      await api.put(`/messages/read/${userId}`);
-      loadConversations(); // Refresh conversations to update unread status
-    } catch (error) {
-      console.error('Failed to mark messages as read:', error);
-    }
-  };
-
-  const filteredConversations = conversations.filter(conv =>
-    conv.user.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = availableUsers.filter(u =>
+    u.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="flex h-[600px] bg-white rounded-lg shadow-lg">
-      {/* Conversations List */}
+    <div className="bg-white rounded-lg shadow-lg h-[600px] flex">
+      {/* Users List */}
       <div className="w-1/3 border-r">
-        <div className="p-4 border-b">
+        <div className="p-4">
           <div className="relative">
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -125,43 +140,35 @@ const MessagingSystem = () => {
         </div>
 
         <div className="overflow-y-auto h-[calc(600px-73px)]">
-          {filteredConversations.map((conv) => (
-            <div
-              key={conv.user._id}
-              onClick={() => setSelectedUser(conv.user._id)}
-              className={`p-4 cursor-pointer hover:bg-slate-50 ${
-                selectedUser === conv.user._id ? 'bg-indigo-50' : ''
-              }`}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold">{conv.user.name}</h3>
-                  <p className="text-sm text-slate-600 truncate">
-                    {conv.lastMessage.content}
-                  </p>
-                </div>
-                <div className="text-xs text-slate-500">
-                  {new Date(conv.lastMessage.createdAt).toLocaleDateString()}
-                  {!conv.lastMessage.read && conv.lastMessage.sender !== user?._id && (
-                    <span className="ml-2 bg-indigo-500 text-white px-2 py-1 rounded-full">
-                      New
-                    </span>
-                  )}
-                </div>
-              </div>
+          {loading ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
             </div>
-          ))}
+          ) : (
+            filteredUsers.map((u) => (
+              <div
+                key={u._id}
+                onClick={() => setSelectedUser(u._id)}
+                className={`p-4 cursor-pointer hover:bg-slate-50 ${
+                  selectedUser === u._id ? 'bg-indigo-50' : ''
+                }`}
+              >
+                <h3 className="font-semibold">{u.name}</h3>
+                <p className="text-sm text-slate-600">{u.role}</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Messages Area */}
+      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedUser ? (
           <>
             {/* Chat Header */}
             <div className="p-4 border-b">
               <h3 className="font-semibold">
-                {conversations.find(c => c.user._id === selectedUser)?.user.name}
+                {availableUsers.find(u => u._id === selectedUser)?.name}
               </h3>
             </div>
 
@@ -182,26 +189,6 @@ const MessagingSystem = () => {
                     }`}
                   >
                     <p>{message.content}</p>
-                    {message.attachments.map((attachment, index) => (
-                      <div key={index} className="mt-2">
-                        {attachment.type === 'image' ? (
-                          <img
-                            src={attachment.url}
-                            alt="attachment"
-                            className="max-w-full rounded"
-                          />
-                        ) : (
-                          <a
-                            href={attachment.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 underline"
-                          >
-                            View Attachment
-                          </a>
-                        )}
-                      </div>
-                    ))}
                     <span className="text-xs opacity-75 mt-1 block">
                       {new Date(message.createdAt).toLocaleTimeString()}
                     </span>
@@ -240,7 +227,7 @@ const MessagingSystem = () => {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-500">
-            Select a conversation to start messaging
+            Select a user to start messaging
           </div>
         )}
       </div>
