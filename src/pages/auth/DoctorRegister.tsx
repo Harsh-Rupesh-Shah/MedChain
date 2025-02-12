@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Phone, Briefcase, FileText, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -9,6 +9,7 @@ const DoctorRegister = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -31,10 +32,10 @@ const DoctorRegister = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setFormData({
-        ...formData,
+      setFormData(prev => ({
+        ...prev,
         idCardImage: file
-      });
+      }));
 
       // Create preview URL
       const reader = new FileReader();
@@ -47,10 +48,13 @@ const DoctorRegister = () => {
 
   const clearImage = () => {
     setImagePreview(null);
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       idCardImage: null
-    });
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,13 +74,27 @@ const DoctorRegister = () => {
     try {
       setLoading(true);
       const formDataObj = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key !== 'confirmPassword' && value !== null) {
-          formDataObj.append(key, value);
-        }
+      
+      // Append all text fields
+      formDataObj.append('name', formData.name);
+      formDataObj.append('email', formData.email);
+      formDataObj.append('password', formData.password);
+      formDataObj.append('phone', formData.phone);
+      formDataObj.append('specialization', formData.specialization);
+      formDataObj.append('licenseNumber', formData.licenseNumber);
+      formDataObj.append('experience', formData.experience);
+      
+      // Append the file with the correct field name
+      if (formData.idCardImage) {
+        formDataObj.append('idCardImage', formData.idCardImage);
+      }
+
+      const response = await api.post('/auth/doctor/register', formDataObj, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      await api.post('/auth/doctor/register', formDataObj);
       toast.success('Registration submitted! Please wait for admin approval.');
       navigate('/login');
     } catch (err: any) {
@@ -258,6 +276,7 @@ const DoctorRegister = () => {
                 onChange={handleFileChange}
                 className="input-field"
                 required
+                ref={fileInputRef}
               />
               <p className="text-xs text-slate-500 mt-1">
                 For testing, you can upload any image file
