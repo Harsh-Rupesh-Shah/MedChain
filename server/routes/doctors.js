@@ -1,6 +1,6 @@
 import express from 'express';
 import { auth, checkRole } from '../middleware/auth.js';
-import Doctor from '../models/Doctor.js';
+import { Doctor, Patient, User, Appointment } from '../models/index.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -36,10 +36,64 @@ const upload = multer({
   }
 });
 
+// Get all patients for doctor
+router.get('/patients', auth, checkRole(['doctor']), async (req, res) => {
+  try {
+    // Find all users with role 'patient'
+    const patientUsers = await User.find({ role: 'patient' });
+    
+    // Get patient profiles
+    const patients = await Patient.find({
+      user: { $in: patientUsers.map(u => u._id) }
+    }).populate('user', 'email');
+
+    // Get doctor's ID
+    const doctor = await Doctor.findOne({ user: req.user.userId });
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    // Enhance patient data with appointment information
+    const enhancedPatients = await Promise.all(patients.map(async (patient) => {
+      // Get the latest appointment
+      const latestAppointment = await Appointment.findOne({
+        doctor: doctor._id,
+        patient: patient._id
+      }).sort({ date: -1 });
+
+      // Get upcoming appointment
+      const upcomingAppointment = await Appointment.findOne({
+        doctor: doctor._id,
+        patient: patient._id,
+        date: { $gt: new Date() },
+        status: 'scheduled'
+      }).sort({ date: 1 });
+
+      return {
+        _id: patient._id,
+        name: patient.name,
+        email: patient.user.email,
+        phone: patient.phone || 'Not provided',
+        dateOfBirth: patient.dateOfBirth,
+        gender: patient.gender || 'Not specified',
+        bloodGroup: patient.bloodGroup || 'Not specified',
+        lastVisit: latestAppointment ? latestAppointment.date : null,
+        upcomingAppointment: upcomingAppointment ? {
+          date: upcomingAppointment.date,
+          time: `${upcomingAppointment.timeSlot.startTime} - ${upcomingAppointment.timeSlot.endTime}`
+        } : null
+      };
+    }));
+
+    res.json(enhancedPatients);
+  } catch (error) {
+    console.error('Get patients error:', error);
+    res.status(500).json({ message: 'Error fetching patients' });
+  }
+});
+
 // Verify doctor ID card
 router.post('/verify-id', upload.single('idCard'), async (req, res) => {
-  console.log('Verify ID request received:', req.file); // Debugging line
-
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No ID card image provided' });
@@ -67,7 +121,7 @@ router.post('/verify-id', upload.single('idCard'), async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const doctors = await Doctor.find()
-      .populate('user', 'email')
+      .populate('user', 'email name')
       .select('-__v');
     res.json(doctors);
   } catch (err) {
