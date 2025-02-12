@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { User, Lock, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 import FaceRecognition from '../../components/FaceRecognition';
+import { useAuth } from '../../hooks/useAuth';
 
 const Login = () => {
-  const navigate = useNavigate();
-  const { login, verifyFace } = useAuth();
-  const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
+  const { login } = useAuth();
+  const [activeTab, setActiveTab] = useState<'patient' | 'doctor' | 'admin'>('patient');
   const [loginMethod, setLoginMethod] = useState<'face' | 'credentials'>('credentials');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,25 +28,9 @@ const Login = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await login(formData.email, formData.password);
-      
-      // Get user role from the response
-      const userRole = response?.data?.user?.role || activeTab;
-      
-      toast.success('Login successful!');
-      
-      // Navigate based on user role
-      if (userRole === 'doctor') {
-        navigate('/doctor/dashboard');
-      } else if (userRole === 'patient') {
-        navigate('/patient/dashboard');
-      } else {
-        // Fallback navigation if role is not determined
-        navigate('/');
-        toast.error('Unable to determine user role');
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      await login(formData.email, formData.password, activeTab);
+    } catch (err: any) {
+      const message = err.message || 'Login failed';
       setError(message);
       toast.error(message);
     } finally {
@@ -59,22 +42,10 @@ const Login = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await verifyFace(image);
-      
-      // Get user role from the response
-      const userRole = response?.data?.user?.role || 'patient';
-      
-      toast.success('Face verification successful!');
-      
-      // Navigate based on user role
-      if (userRole === 'patient') {
-        navigate('/patient/dashboard');
-      } else {
-        navigate('/');
-        toast.error('Face login is only available for patients');
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Face verification failed';
+      const { verifyFace } = useAuth();
+      await verifyFace(image);
+    } catch (err: any) {
+      const message = err.message || 'Face verification failed';
       setError(message);
       toast.error(message);
     } finally {
@@ -104,6 +75,15 @@ const Login = () => {
               }}
             >
               Doctor Login
+            </button>
+            <button
+              className={`auth-tab flex-1 ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('admin');
+                setLoginMethod('credentials');
+              }}
+            >
+              Admin Login
             </button>
           </div>
 
@@ -141,7 +121,7 @@ const Login = () => {
             </div>
           )}
 
-          {(activeTab === 'doctor' || (activeTab === 'patient' && loginMethod === 'credentials')) && (
+          {(activeTab !== 'patient' || (activeTab === 'patient' && loginMethod === 'credentials')) && (
             <form onSubmit={handleCredentialsLogin}>
               <div className="space-y-4">
                 <div>
@@ -195,11 +175,16 @@ const Login = () => {
             <FaceRecognition onCapture={handleFaceLogin} mode="verify" />
           )}
 
-          <div className="mt-4 text-center">
-            <Link to="/register" className="text-indigo-600 hover:text-indigo-700">
-              New user? Register here
-            </Link>
-          </div>
+          {activeTab !== 'admin' && (
+            <div className="mt-4 text-center">
+              <Link 
+                to={activeTab === 'doctor' ? '/doctor/register' : '/patient/register'} 
+                className="text-indigo-600 hover:text-indigo-700"
+              >
+                New {activeTab}? Register here
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

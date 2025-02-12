@@ -20,9 +20,26 @@ interface Profile {
   };
 }
 
+const defaultProfile: Profile = {
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  dateOfBirth: '',
+  gender: 'male',
+  bloodGroup: '',
+  allergies: [],
+  chronicConditions: [],
+  emergencyContact: {
+    name: '',
+    relationship: '',
+    phone: ''
+  }
+};
+
 const ProfileSection = () => {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [editedProfile, setEditedProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile>(defaultProfile);
+  const [editedProfile, setEditedProfile] = useState<Profile>(defaultProfile);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -34,18 +51,19 @@ const ProfileSection = () => {
     try {
       setLoading(true);
       const response = await api.get('/patients/profile');
-      setProfile(response.data);
-      setEditedProfile(response.data);
+      const profileData = response.data || defaultProfile;
+      setProfile(profileData);
+      setEditedProfile(profileData);
     } catch (error) {
       toast.error('Failed to load profile');
+      setProfile(defaultProfile);
+      setEditedProfile(defaultProfile);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!editedProfile) return;
-
     try {
       setLoading(true);
       const response = await api.put('/patients/profile', editedProfile);
@@ -119,12 +137,12 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="text"
-                  value={editedProfile?.name}
-                  onChange={(e) => setEditedProfile({ ...editedProfile!, name: e.target.value })}
+                  value={editedProfile.name}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, name: e.target.value })}
                   className="input-field"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.name}</p>
+                <p className="text-slate-900">{profile.name || 'Not set'}</p>
               )}
             </div>
 
@@ -132,7 +150,7 @@ const ProfileSection = () => {
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Email
               </label>
-              <p className="text-slate-900">{profile?.email}</p>
+              <p className="text-slate-900">{profile.email || 'Not set'}</p>
             </div>
 
             <div>
@@ -142,12 +160,12 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="tel"
-                  value={editedProfile?.phone}
-                  onChange={(e) => setEditedProfile({ ...editedProfile!, phone: e.target.value })}
+                  value={editedProfile.phone}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, phone: e.target.value })}
                   className="input-field"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.phone}</p>
+                <p className="text-slate-900">{profile.phone || 'Not set'}</p>
               )}
             </div>
 
@@ -157,13 +175,13 @@ const ProfileSection = () => {
               </label>
               {editing ? (
                 <textarea
-                  value={editedProfile?.address}
-                  onChange={(e) => setEditedProfile({ ...editedProfile!, address: e.target.value })}
+                  value={editedProfile.address}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, address: e.target.value })}
                   className="input-field"
                   rows={3}
                 />
               ) : (
-                <p className="text-slate-900">{profile?.address}</p>
+                <p className="text-slate-900">{profile.address || 'Not set'}</p>
               )}
             </div>
           </div>
@@ -179,13 +197,13 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="date"
-                  value={editedProfile?.dateOfBirth}
-                  onChange={(e) => setEditedProfile({ ...editedProfile!, dateOfBirth: e.target.value })}
+                  value={editedProfile.dateOfBirth}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, dateOfBirth: e.target.value })}
                   className="input-field"
                 />
               ) : (
                 <p className="text-slate-900">
-                  {new Date(profile?.dateOfBirth || '').toLocaleDateString()}
+                  {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : 'Not set'}
                 </p>
               )}
             </div>
@@ -196,8 +214,8 @@ const ProfileSection = () => {
               </label>
               {editing ? (
                 <select
-                  value={editedProfile?.gender}
-                  onChange={(e) => setEditedProfile({ ...editedProfile!, gender: e.target.value as 'male' | 'female' | 'other' })}
+                  value={editedProfile.gender}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, gender: e.target.value as 'male' | 'female' | 'other' })}
                   className="input-field"
                 >
                   <option value="male">Male</option>
@@ -205,7 +223,7 @@ const ProfileSection = () => {
                   <option value="other">Other</option>
                 </select>
               ) : (
-                <p className="text-slate-900">{profile?.gender}</p>
+                <p className="text-slate-900">{profile.gender || 'Not set'}</p>
               )}
             </div>
 
@@ -215,10 +233,11 @@ const ProfileSection = () => {
               </label>
               {editing ? (
                 <select
-                  value={editedProfile?.bloodGroup}
-                  onChange={(e) => setEditedProfile({ ...editedProfile!, bloodGroup: e.target.value })}
+                  value={editedProfile.bloodGroup}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, bloodGroup: e.target.value })}
                   className="input-field"
                 >
+                  <option value="">Select Blood Group</option>
                   <option value="A+">A+</option>
                   <option value="A-">A-</option>
                   <option value="B+">B+</option>
@@ -229,7 +248,7 @@ const ProfileSection = () => {
                   <option value="O-">O-</option>
                 </select>
               ) : (
-                <p className="text-slate-900">{profile?.bloodGroup}</p>
+                <p className="text-slate-900">{profile.bloodGroup || 'Not set'}</p>
               )}
             </div>
 
@@ -240,16 +259,16 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="text"
-                  value={editedProfile?.allergies.join(', ')}
+                  value={editedProfile.allergies.join(', ')}
                   onChange={(e) => setEditedProfile({ 
-                    ...editedProfile!, 
+                    ...editedProfile, 
                     allergies: e.target.value.split(',').map(item => item.trim()) 
                   })}
                   className="input-field"
                   placeholder="Separate allergies with commas"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.allergies.join(', ') || 'None'}</p>
+                <p className="text-slate-900">{profile.allergies.length > 0 ? profile.allergies.join(', ') : 'None'}</p>
               )}
             </div>
 
@@ -260,16 +279,16 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="text"
-                  value={editedProfile?.chronicConditions.join(', ')}
+                  value={editedProfile.chronicConditions.join(', ')}
                   onChange={(e) => setEditedProfile({ 
-                    ...editedProfile!, 
+                    ...editedProfile, 
                     chronicConditions: e.target.value.split(',').map(item => item.trim()) 
                   })}
                   className="input-field"
                   placeholder="Separate conditions with commas"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.chronicConditions.join(', ') || 'None'}</p>
+                <p className="text-slate-900">{profile.chronicConditions.length > 0 ? profile.chronicConditions.join(', ') : 'None'}</p>
               )}
             </div>
           </div>
@@ -286,18 +305,18 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="text"
-                  value={editedProfile?.emergencyContact.name}
+                  value={editedProfile.emergencyContact.name}
                   onChange={(e) => setEditedProfile({
-                    ...editedProfile!,
+                    ...editedProfile,
                     emergencyContact: {
-                      ...editedProfile!.emergencyContact,
+                      ...editedProfile.emergencyContact,
                       name: e.target.value
                     }
                   })}
                   className="input-field"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.emergencyContact.name}</p>
+                <p className="text-slate-900">{profile.emergencyContact.name || 'Not set'}</p>
               )}
             </div>
 
@@ -308,18 +327,18 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="text"
-                  value={editedProfile?.emergencyContact.relationship}
+                  value={editedProfile.emergencyContact.relationship}
                   onChange={(e) => setEditedProfile({
-                    ...editedProfile!,
+                    ...editedProfile,
                     emergencyContact: {
-                      ...editedProfile!.emergencyContact,
+                      ...editedProfile.emergencyContact,
                       relationship: e.target.value
                     }
                   })}
                   className="input-field"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.emergencyContact.relationship}</p>
+                <p className="text-slate-900">{profile.emergencyContact.relationship || 'Not set'}</p>
               )}
             </div>
 
@@ -330,18 +349,18 @@ const ProfileSection = () => {
               {editing ? (
                 <input
                   type="tel"
-                  value={editedProfile?.emergencyContact.phone}
+                  value={editedProfile.emergencyContact.phone}
                   onChange={(e) => setEditedProfile({
-                    ...editedProfile!,
+                    ...editedProfile,
                     emergencyContact: {
-                      ...editedProfile!.emergencyContact,
+                      ...editedProfile.emergencyContact,
                       phone: e.target.value
                     }
                   })}
                   className="input-field"
                 />
               ) : (
-                <p className="text-slate-900">{profile?.emergencyContact.phone}</p>
+                <p className="text-slate-900">{profile.emergencyContact.phone || 'Not set'}</p>
               )}
             </div>
           </div>
