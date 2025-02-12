@@ -334,4 +334,91 @@ router.post('/patient/face-login', upload.single('face'), async (req, res) => {
   }
 });
 
+router.post('/admin/login',
+  [
+    body('email').isEmail().withMessage('Please enter a valid email'),
+    body('password').exists().withMessage('Password is required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ 
+          message: 'Validation error', 
+          errors: errors.array() 
+        });
+      }
+
+      const { email, password } = req.body;
+
+      // Check if it's the admin email
+      if (email !== 'hrsshah04022004@gmail.com') {
+        return res.status(401).json({ message: 'Not authorized as admin' });
+      }
+
+      // For the demo, use a hardcoded password check
+      if (password !== 'Moon@11light') {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Create a stable admin ID
+      const adminId = 'admin-' + Buffer.from(email).toString('hex');
+
+      // Generate token with stable ID
+      const token = jwt.sign(
+        { 
+          userId: adminId,
+          role: 'admin',
+          email: email
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      // Send response with consistent user object structure
+      res.json({
+        token,
+        user: {
+          _id: adminId,
+          email: email,
+          role: 'admin',
+          name: 'Admin'
+        }
+      });
+    } catch (err) {
+      console.error('Admin login error:', err);
+      res.status(500).json({ message: 'Server error during login' });
+    }
+  }
+);
+
+// Get current user
+router.get('/me', auth, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      // For admin, return the user object directly
+      return res.json({
+        _id: req.user.userId,
+        email: req.user.email,
+        role: 'admin',
+        name: 'Admin'
+      });
+    }
+
+    // For regular users, fetch from database
+    const user = await User.findById(req.user.userId)
+      .select('-password')
+      .populate('profile');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error('Get current user error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 export default router;
