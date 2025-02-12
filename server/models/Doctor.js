@@ -34,6 +34,7 @@ const doctorSchema = new mongoose.Schema({
     coordinates: {
       type: {
         type: String,
+        enum: ['Point'],
         default: 'Point'
       },
       coordinates: {
@@ -70,4 +71,4 @@ const doctorSchema = new mongoose.Schema({
 
 doctorSchema.index({ 'location.coordinates': '2dsphere' });
 
-export default mongoose.model('Doctor', doctorSchema);
+export default doctorSchema;

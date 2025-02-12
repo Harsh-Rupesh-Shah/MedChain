@@ -59,14 +59,20 @@ const RecordsManager = () => {
       formData.append('type', newRecord.type);
       formData.append('title', newRecord.title);
       formData.append('date', newRecord.date);
-      formData.append('doctor', newRecord.doctor);
+      
+      // Only append doctor if it's being added by a doctor
+      if (newRecord.doctor.trim()) {
+        // Skip adding doctor field for patient-added records
+        // This will make the field optional in the backend
+      }
+      
       formData.append('description', newRecord.description);
 
       selectedFiles.forEach(file => {
         formData.append('attachments', file);
       });
 
-      await api.post('/patients/records', formData, {
+      const response = await api.post('/medical-records', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

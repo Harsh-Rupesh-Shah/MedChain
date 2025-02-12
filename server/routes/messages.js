@@ -44,6 +44,7 @@ router.get('/conversations', auth, async (req, res) => {
 
     res.json(conversations);
   } catch (error) {
+    console.error('Get conversations error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -63,6 +64,7 @@ router.get('/:userId', auth, async (req, res) => {
 
     res.json(messages);
   } catch (error) {
+    console.error('Get messages error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -85,8 +87,12 @@ router.post('/', auth, async (req, res) => {
       .populate('sender', 'name role')
       .populate('receiver', 'name role');
 
+    // Emit socket event for real-time update
+    req.app.get('io').to(`user_${receiverId}`).emit('new_message', populatedMessage);
+
     res.status(201).json(populatedMessage);
   } catch (error) {
+    console.error('Send message error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -105,6 +111,7 @@ router.put('/read/:userId', auth, async (req, res) => {
 
     res.json({ message: 'Messages marked as read' });
   } catch (error) {
+    console.error('Mark messages as read error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
