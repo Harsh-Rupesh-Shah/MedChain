@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 import FaceRecognition from '../../components/FaceRecognition';
 import api from '../../services/api';
@@ -34,18 +33,22 @@ const Login = () => {
       const response = await api.post(endpoint, formData);
       
       const { token, user } = response.data;
+      
+      // Store token and user data
       localStorage.setItem('token', token);
-      console.log(response.data);
+      localStorage.setItem('user', JSON.stringify(user));
 
       toast.success('Login successful!');
       
-      // Redirect based on user role
+      // Immediate redirect based on role
+      console.log('User role:', user.role); // Debug log
+      
       if (user.role === 'doctor') {
-        navigate('/doctor/dashboard');
+        navigate('/doctor/dashboard', { replace: true });
       } else if (user.role === 'patient') {
-        navigate('/patient/dashboard');
+        navigate('/patient/dashboard', { replace: true });
       } else if (user.role === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       }
     } catch (err: any) {
       const message = err.response?.data?.message || 'Login failed';
@@ -71,10 +74,13 @@ const Login = () => {
       });
 
       const { token, user } = response.data;
+      
+      // Store token and user data
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
 
       toast.success('Face verification successful!');
-      navigate('/patient/dashboard');
+      navigate('/patient/dashboard', { replace: true });
     } catch (err: any) {
       const message = err.response?.data?.message || 'Face verification failed';
       setError(message);
