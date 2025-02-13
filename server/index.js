@@ -10,6 +10,7 @@ import appointmentRoutes from './routes/appointments.js';
 import messageRoutes from './routes/messages.js';
 import pharmacyRoutes from './routes/pharmacy.js';
 import medicalRecordsRoutes from './routes/medical-records.js';
+import adminRoutes from './routes/admin.js';
 import initializeSocket from './socket.js';
 
 // Load environment variables
@@ -46,7 +47,8 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
-app.use('/api/medical-records', medicalRecordsRoutes); // Add this line
+app.use('/api/medical-records', medicalRecordsRoutes);
+app.use('/api/admin', adminRoutes); // Add this line to register admin routes
 
 // Error handling middleware
 app.use((err, req, res, next) => {

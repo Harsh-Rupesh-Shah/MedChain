@@ -18,7 +18,7 @@ const DoctorDashboard = () => {
     { name: 'Patients', path: 'patients', icon: Users },
     { name: 'Appointments', path: 'appointments', icon: Calendar },
     { name: 'Medical Records', path: 'records', icon: FileText },
-    { name: 'Analytics', path: 'analytics', icon: ChartBar },
+    // { name: 'Analytics', path: 'analytics', icon: ChartBar },
     { name: 'Messages', path: 'messages', icon: MessageSquare },
     { name: 'Profile', path: 'profile', icon: User },
     { name: 'Settings', path: 'settings', icon: Settings },
@@ -62,7 +62,7 @@ const DoctorDashboard = () => {
             <Route path="patients" element={<PatientList />} />
             <Route path="appointments" element={<AppointmentManager />} />
             <Route path="records" element={<MedicalRecordsViewer />} />
-            <Route path="analytics" element={<AnalyticsDashboard />} />
+            {/* <Route path="analytics" element={<AnalyticsDashboard />} /> */}
             <Route path="messages" element={<MessagingSystem />} />
             <Route path="profile" element={<ProfileSection />} />
             <Route path="settings" element={<SettingsPage />} />
