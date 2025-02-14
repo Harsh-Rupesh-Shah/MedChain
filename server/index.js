@@ -44,11 +44,11 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use('/api/auth', authRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/patients', patientRoutes);
-app.use('/api/appointments', appointmentRoutes);
+app.use('/api/appointments', appointmentRoutes); // Make sure this line exists
 app.use('/api/messages', messageRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
 app.use('/api/medical-records', medicalRecordsRoutes);
-app.use('/api/admin', adminRoutes); // Add this line to register admin routes
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
