@@ -19,9 +19,9 @@ interface Profile {
     relationship: string;
     phone: string;
   };
-  specialization?: string; // For doctors only
-  licenseNumber?: string; // For doctors only
-  experience?: number; // For doctors only
+  specialization?: string;
+  licenseNumber?: string;
+  experience?: number;
 }
 
 const defaultProfile: Profile = {
@@ -57,7 +57,17 @@ const ProfileSection = () => {
       setLoading(true);
       const endpoint = user?.role === 'doctor' ? '/doctors/profile' : '/patients/profile';
       const response = await api.get(endpoint);
-      const profileData = response.data || defaultProfile;
+      
+      // Ensure all required fields exist with default values
+      const profileData = {
+        ...defaultProfile,
+        ...response.data,
+        emergencyContact: {
+          ...defaultProfile.emergencyContact,
+          ...response.data.emergencyContact
+        }
+      };
+      
       setProfile(profileData);
       setEditedProfile(profileData);
     } catch (error) {
@@ -74,7 +84,18 @@ const ProfileSection = () => {
       setLoading(true);
       const endpoint = user?.role === 'doctor' ? '/doctors/profile' : '/patients/profile';
       const response = await api.put(endpoint, editedProfile);
-      setProfile(response.data);
+      
+      // Ensure all required fields exist with default values
+      const updatedProfile = {
+        ...defaultProfile,
+        ...response.data,
+        emergencyContact: {
+          ...defaultProfile.emergencyContact,
+          ...response.data.emergencyContact
+        }
+      };
+      
+      setProfile(updatedProfile);
       setEditing(false);
       toast.success('Profile updated successfully');
     } catch (error) {
@@ -103,6 +124,7 @@ const ProfileSection = () => {
               <button
                 onClick={handleSave}
                 className="btn-primary flex items-center"
+                disabled={loading}
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes

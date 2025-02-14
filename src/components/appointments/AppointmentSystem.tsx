@@ -1,40 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Video, AlertCircle, Calendar as CalendarIcon, X, Plus } from 'lucide-react';
+import { Calendar, Clock, Video, AlertCircle, Plus, X } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
 
 interface Appointment {
-  id: string;
-  patientName: string;
-  doctorName: string;
+  _id: string;
+  patient: {
+    _id: string;
+    name: string;
+  };
+  doctor: {
+    _id: string;
+    name: string;
+    specialization: string;
+  };
   date: string;
-  time: string;
+  timeSlot: {
+    startTime: string;
+    endTime: string;
+  };
   type: 'in-person' | 'video';
-  status: 'scheduled' | 'completed' | 'cancelled' | 'waiting';
+  status: 'scheduled' | 'completed' | 'cancelled';
   notes?: string;
+  meetLink?: string;
 }
 
 interface Doctor {
   _id: string;
   name: string;
   specialization: string;
-  availability: {
-    day: string;
-    slots: {
-      startTime: string;
-      endTime: string;
-      isBooked: boolean;
-    }[];
-  }[];
 }
 
 const AppointmentSystem = () => {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [selectedDoctor, setSelectedDoctor] = useState<string>('');
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<{ startTime: string; endTime: string; }[]>([]);
   const [newAppointment, setNewAppointment] = useState({
     doctorId: '',
     date: new Date().toISOString().split('T')[0],
@@ -50,6 +52,12 @@ const AppointmentSystem = () => {
     loadAppointments();
     loadDoctors();
   }, []);
+
+  useEffect(() => {
+    if (newAppointment.doctorId && newAppointment.date) {
+      loadAvailableSlots();
+    }
+  }, [newAppointment.doctorId, newAppointment.date]);
 
   const loadAppointments = async () => {
     try {
@@ -72,18 +80,34 @@ const AppointmentSystem = () => {
     }
   };
 
-  const handleSchedule = async () => {
+  const loadAvailableSlots = async () => {
+    if (!newAppointment.doctorId || !newAppointment.date) return;
+    
     try {
-      if (!newAppointment.doctorId || !newAppointment.timeSlot.startTime) {
-        toast.error('Please select a doctor and time slot');
-        return;
-      }
+      const response = await api.get(`/doctors/${newAppointment.doctorId}/slots`, {
+        params: { date: newAppointment.date }
+      });
+      setAvailableSlots(response.data.slots || []);
+    } catch (error) {
+      console.error('Failed to load slots:', error);
+      setAvailableSlots([]);
+    }
+  };
 
+  const handleSchedule = async () => {
+    if (!newAppointment.doctorId || !newAppointment.timeSlot.startTime) {
+      toast.error('Please select a doctor and time slot');
+      return;
+    }
+
+    try {
       setLoading(true);
       await api.post('/appointments', newAppointment);
       toast.success('Appointment scheduled successfully');
       setShowSchedule(false);
       loadAppointments();
+      
+      // Reset form
       setNewAppointment({
         doctorId: '',
         date: new Date().toISOString().split('T')[0],
@@ -111,18 +135,8 @@ const AppointmentSystem = () => {
     }
   };
 
-  const getAvailableSlots = () => {
-    if (!selectedDoctor || !newAppointment.date) return [];
-    
-    const doctor = doctors.find(d => d._id === newAppointment.doctorId);
-    if (!doctor) return [];
-
-    const dayOfWeek = new Date(newAppointment.date)
-      .toLocaleDateString('en-US', { weekday: 'monday' })
-      .toLowerCase();
-      
-    const availability = doctor.availability.find(a => a.day === dayOfWeek);
-    return availability?.slots.filter(slot => !slot.isBooked) || [];
+  const handleJoinMeeting = (meetLink: string) => {
+    window.open(meetLink, '_blank');
   };
 
   return (
@@ -149,32 +163,38 @@ const AppointmentSystem = () => {
             <h3 className="font-semibold text-lg mb-4">Upcoming Appointments</h3>
             {appointments.map((apt) => (
               <div
-                key={apt.id}
+                key={apt._id}
                 className={`border rounded-lg p-4 ${
                   apt.status === 'cancelled' ? 'bg-red-50' :
-                  apt.status === 'completed' ? 'bg-green-50' :
-                  apt.status === 'waiting' ? 'bg-yellow-50' : 'bg-white'
+                  apt.status === 'completed' ? 'bg-green-50' : 'bg-white'
                 }`}
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-semibold">{apt.type === 'video' ? 'Video Call' : 'In-Person'}</h4>
-                    <p className="text-sm text-slate-600">with Dr. {apt.doctorName}</p>
-                    <p className="text-sm text-slate-600">{new Date(apt.date).toLocaleDateString()} at {apt.time}</p>
+                    <p className="text-sm text-slate-600">with Dr. {apt.doctor.name}</p>
+                    <p className="text-sm text-slate-600">
+                      {new Date(apt.date).toLocaleDateString()} at {apt.timeSlot.startTime}
+                    </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {apt.type === 'video' && apt.status === 'scheduled' && (
-                      <button className="btn-primary text-sm">
+                    {apt.type === 'video' && apt.status === 'scheduled' && apt.meetLink && (
+                      <button
+                        onClick={() => handleJoinMeeting(apt.meetLink!)}
+                        className="btn-primary text-sm"
+                      >
                         <Video className="h-4 w-4 mr-1 inline" />
                         Join Call
                       </button>
                     )}
-                    <button
-                      onClick={() => handleCancel(apt.id)}
-                      className="text-red-500 text-sm"
-                    >
-                      Cancel
-                    </button>
+                    {apt.status === 'scheduled' && (
+                      <button
+                        onClick={() => handleCancel(apt._id)}
+                        className="text-red-500 text-sm hover:text-red-600"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 </div>
                 {apt.notes && (
@@ -182,14 +202,17 @@ const AppointmentSystem = () => {
                 )}
               </div>
             ))}
+
+            {appointments.length === 0 && (
+              <p className="text-center text-slate-500 py-4">No appointments scheduled</p>
+            )}
           </div>
 
           {/* Calendar View */}
           <div>
             <div className="bg-slate-50 rounded-lg p-4">
               <Calendar
-                value={selectedDate}
-                onChange={setSelectedDate}
+                value={new Date()}
                 className="w-full"
               />
             </div>
@@ -215,7 +238,11 @@ const AppointmentSystem = () => {
                 </label>
                 <select
                   value={newAppointment.doctorId}
-                  onChange={(e) => setNewAppointment({ ...newAppointment, doctorId: e.target.value })}
+                  onChange={(e) => setNewAppointment({
+                    ...newAppointment,
+                    doctorId: e.target.value,
+                    timeSlot: { startTime: '', endTime: '' }
+                  })}
                   className="input-field"
                 >
                   <option value="">Choose a doctor</option>
@@ -234,7 +261,11 @@ const AppointmentSystem = () => {
                 <input
                   type="date"
                   value={newAppointment.date}
-                  onChange={(e) => setNewAppointment({ ...newAppointment, date: e.target.value })}
+                  onChange={(e) => setNewAppointment({
+                    ...newAppointment,
+                    date: e.target.value,
+                    timeSlot: { startTime: '', endTime: '' }
+                  })}
                   className="input-field"
                   min={new Date().toISOString().split('T')[0]}
                 />
@@ -245,26 +276,34 @@ const AppointmentSystem = () => {
                   Time Slot
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {getAvailableSlots().map((slot, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => setNewAppointment({
-                        ...newAppointment,
-                        timeSlot: {
-                          startTime: slot.startTime,
-                          endTime: slot.endTime
-                        }
-                      })}
-                      className={`p-2 rounded-lg border text-sm ${
-                        newAppointment.timeSlot.startTime === slot.startTime
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                          : 'border-slate-200 hover:border-indigo-500'
-                      }`}
-                    >
-                      {slot.startTime}
-                    </button>
-                  ))}
+                  {availableSlots.length > 0 ? (
+                    availableSlots.map((slot, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => setNewAppointment({
+                          ...newAppointment,
+                          timeSlot: {
+                            startTime: slot.startTime,
+                            endTime: slot.endTime
+                          }
+                        })}
+                        className={`p-2 rounded-lg border text-sm ${
+                          newAppointment.timeSlot.startTime === slot.startTime
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                            : 'border-slate-200 hover:border-indigo-500'
+                        }`}
+                      >
+                        {slot.startTime}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="col-span-3 text-center text-slate-500 py-2">
+                      {newAppointment.doctorId && newAppointment.date 
+                        ? 'No available slots for selected date' 
+                        : 'Select doctor and date to view available slots'}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -312,7 +351,6 @@ const AppointmentSystem = () => {
 
               <button
                 onClick={handleSchedule}
-                disabled={loading || !newAppointment.doctorId || !newAppointment.timeSlot.startTime}
                 className="btn-primary w-full"
               >
                 {loading ? 'Scheduling...' : 'Schedule Appointment'}

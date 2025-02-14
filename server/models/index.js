@@ -7,21 +7,11 @@ import messageSchema from './Message.js';
 import medicalRecordSchema from './MedicalRecord.js';
 import productSchema from './Product.js';
 
-// Register all models
-const User = mongoose.model('User', userSchema);
-const Doctor = mongoose.model('Doctor', doctorSchema);
-const Patient = mongoose.model('Patient', patientSchema);
-const Appointment = mongoose.model('Appointment', appointmentSchema);
-const Message = mongoose.model('Message', messageSchema);
-const MedicalRecord = mongoose.model('MedicalRecord', medicalRecordSchema);
-const Product = mongoose.model('Product', productSchema);
-
-export {
-  User,
-  Doctor,
-  Patient,
-  Appointment,
-  Message,
-  MedicalRecord,
-  Product
-};
+// Register all models and export them
+export const User = mongoose.model('User', userSchema);
+export const Doctor = mongoose.model('Doctor', doctorSchema);
+export const Patient = mongoose.model('Patient', patientSchema);
+export const Appointment = mongoose.model('Appointment', appointmentSchema);
+export const Message = mongoose.model('Message', messageSchema);
+export const MedicalRecord = mongoose.model('MedicalRecord', medicalRecordSchema);
+export const Product = mongoose.model('Product', productSchema);
