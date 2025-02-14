@@ -36,67 +36,127 @@ const upload = multer({
   }
 });
 
-// Get patient's medical records
-router.get('/patients/:patientId/records', auth, checkRole(['doctor']), async (req, res) => {
+// Get all doctors
+router.get('/', async (req, res) => {
   try {
-    const records = await MedicalRecord.find({ patient: req.params.patientId })
-      .populate('doctor', 'name')
-      .sort({ date: -1 });
-    res.json(records);
+    const doctors = await Doctor.find()
+      .select('name specialization');
+    res.json(doctors);
   } catch (error) {
-    console.error('Get patient records error:', error);
-    res.status(500).json({ message: 'Error fetching medical records' });
+    console.error('Get doctors error:', error);
+    res.status(500).json({ message: 'Error fetching doctors' });
   }
 });
 
-// Get all patients for doctor
+// Get doctor's available time slots
+router.get('/:doctorId/slots', auth, async (req, res) => {
+  try {
+    const { date } = req.query;
+    
+    // Get doctor based on user ID if it's the doctor checking their own slots
+    const doctorId = req.user.role === 'doctor' ? req.user.userId : req.params.doctorId;
+    const doctor = await Doctor.findOne({ user: doctorId });
+    
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    // Get day of week from date (0 = Sunday, 1 = Monday, etc.)
+    const dayIndex = new Date(date).getDay();
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = days[dayIndex];
+    
+    // Get doctor's availability for that day
+    const dayAvailability = doctor.availability.find(a => a.day === dayOfWeek);
+    
+    if (!dayAvailability) {
+      return res.json({ slots: [] });
+    }
+
+    // Get existing appointments for that date
+    const existingAppointments = await Appointment.find({
+      doctor: doctor._id,
+      date,
+      status: 'scheduled'
+    });
+
+    // Filter out booked slots
+    const availableSlots = dayAvailability.slots.filter(slot => {
+      return !existingAppointments.some(apt => 
+        apt.timeSlot.startTime === slot.startTime &&
+        apt.timeSlot.endTime === slot.endTime
+      );
+    });
+
+    res.json({ slots: availableSlots });
+  } catch (error) {
+    console.error('Get slots error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all patients for a doctor
 router.get('/patients', auth, checkRole(['doctor']), async (req, res) => {
   try {
-    // Find all users with role 'patient'
-    const patientUsers = await User.find({ role: 'patient' });
-    
-    // Get patient profiles
-    const patients = await Patient.find({
-      user: { $in: patientUsers.map(u => u._id) }
-    }).populate('user', 'email');
+    // First get all patients with their user data in a single query
+    const patients = await Patient.aggregate([
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'userData'
+        }
+      },
+      {
+        $unwind: {
+          path: '$userData',
+          preserveNullAndEmptyArrays: true // Keep patients even if no user found
+        }
+      }
+    ]);
 
-    // Get doctor's ID
+    // Get doctor's appointments for these patients
     const doctor = await Doctor.findOne({ user: req.user.userId });
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
-    // Enhance patient data with appointment information
-    const enhancedPatients = await Promise.all(patients.map(async (patient) => {
-      // Get the latest appointment
-      const latestAppointment = await Appointment.findOne({
-        doctor: doctor._id,
-        patient: patient._id
-      }).sort({ date: -1 });
+    const appointments = await Appointment.find({ doctor: doctor._id });
 
-      // Get upcoming appointment
-      const upcomingAppointment = await Appointment.findOne({
-        doctor: doctor._id,
-        patient: patient._id,
-        date: { $gt: new Date() },
-        status: 'scheduled'
-      }).sort({ date: 1 });
+    // Enhance patient data with appointment information
+    const enhancedPatients = patients.map(patient => {
+      const patientAppointments = appointments.filter(apt => 
+        apt.patient.toString() === patient._id.toString()
+      );
+
+      const lastVisit = patientAppointments
+        .filter(apt => apt.status === 'completed')
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+      const upcomingAppointment = patientAppointments
+        .filter(apt => 
+          apt.status === 'scheduled' && 
+          new Date(apt.date) > new Date()
+        )
+        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
 
       return {
         _id: patient._id,
         name: patient.name,
-        email: patient.user.email,
+        email: patient.userData?.email || 'Email not available',
         phone: patient.phone || 'Not provided',
         dateOfBirth: patient.dateOfBirth,
         gender: patient.gender || 'Not specified',
         bloodGroup: patient.bloodGroup || 'Not specified',
-        lastVisit: latestAppointment ? latestAppointment.date : null,
+        lastVisit: lastVisit ? lastVisit.date : null,
         upcomingAppointment: upcomingAppointment ? {
           date: upcomingAppointment.date,
           time: `${upcomingAppointment.timeSlot.startTime} - ${upcomingAppointment.timeSlot.endTime}`
-        } : null
+        } : null,
+        hasHistory: patientAppointments.length > 0
       };
-    }));
+    });
 
     res.json(enhancedPatients);
   } catch (error) {
@@ -105,6 +165,39 @@ router.get('/patients', auth, checkRole(['doctor']), async (req, res) => {
   }
 });
 
+// Get patient's medical records
+// Get doctor profile
+router.get('/profile', auth, checkRole(['doctor']), async (req, res) => {
+  try {
+    const doctor = await Doctor.findOne({ user: req.user.userId })
+      .populate('user', 'email');
+    
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor profile not found' });
+    }
+
+    res.json(doctor);
+  } catch (error) {
+    console.error('Get doctor profile error:', error);
+    res.status(500).json({ message: 'Error fetching doctor profile' });
+  }
+});
+
+// Get patient's medical records
+router.get('/patients/:patientId/records', auth, checkRole(['doctor']), async (req, res) => {
+  try {
+    const records = await MedicalRecord.find({ 
+      patient: req.params.patientId 
+    })
+    .populate('doctor', 'name')
+    .sort({ date: -1 });
+
+    res.json(records);
+  } catch (error) {
+    console.error('Get patient records error:', error);
+    res.status(500).json({ message: 'Error fetching medical records' });
+  }
+});
 
 // Verify doctor ID card
 router.post('/verify-id', upload.single('idCard'), async (req, res) => {
