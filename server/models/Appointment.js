@@ -31,6 +31,7 @@ const appointmentSchema = new mongoose.Schema({
   },
   symptoms: [String],
   notes: String,
+  meetLink: String,
   prescription: {
     medications: [{
       name: String,

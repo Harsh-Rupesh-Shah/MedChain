@@ -21,8 +21,7 @@ const medicalRecordSchema = new mongoose.Schema({
   },
   doctor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Doctor',
-    required: false
+    ref: 'Doctor'
   },
   description: String,
   attachments: [{
