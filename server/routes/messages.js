@@ -87,8 +87,11 @@ router.post('/', auth, async (req, res) => {
       .populate('sender', 'name role')
       .populate('receiver', 'name role');
 
-    // Emit socket event for real-time update
-    req.app.get('io').to(`user_${receiverId}`).emit('new_message', populatedMessage);
+    // Emit socket event using global io instance
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${receiverId}`).emit('new_message', populatedMessage);
+    }
 
     res.status(201).json(populatedMessage);
   } catch (error) {

@@ -22,6 +22,9 @@ const httpServer = createServer(app);
 // Initialize Socket.IO
 const io = initializeSocket(httpServer);
 
+// Make io available to routes
+app.set('io', io);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -44,7 +47,7 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use('/api/auth', authRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/patients', patientRoutes);
-app.use('/api/appointments', appointmentRoutes); // Make sure this line exists
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
 app.use('/api/medical-records', medicalRecordsRoutes);

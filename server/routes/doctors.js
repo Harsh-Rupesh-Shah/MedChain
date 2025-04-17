@@ -1,6 +1,6 @@
 import express from 'express';
 import { auth, checkRole } from '../middleware/auth.js';
-import { Doctor, Patient, User, Appointment } from '../models/index.js';
+import { Doctor, Patient, User, Appointment, MedicalRecord } from '../models/index.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -186,19 +186,35 @@ router.get('/profile', auth, checkRole(['doctor']), async (req, res) => {
 // Get patient's medical records
 router.get('/patients/:patientId/records', auth, checkRole(['doctor']), async (req, res) => {
   try {
-    const records = await MedicalRecord.find({ 
-      patient: req.params.patientId 
+    console.log('Fetching records for patient:', req.params.patientId);
+
+    const doctor = await Doctor.findOne({ user: req.user.userId });
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    // First, get the Patient to retrieve the user ObjectId
+    const patient = await Patient.findById(req.params.patientId);
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+
+    // Now fetch records using patient's `user` ObjectId
+    const records = await MedicalRecord.find({
+      patient: patient.user
     })
     .populate('doctor', 'name')
+    .populate('patient', 'name')
     .sort({ date: -1 });
+
+    console.log('Found records:', records);
 
     res.json(records);
   } catch (error) {
     console.error('Get patient records error:', error);
-    res.status(500).json({ message: 'Error fetching medical records' });
+    res.status(500).json({ message: 'Server error' });
   }
 });
-
 // Verify doctor ID card
 router.post('/verify-id', upload.single('idCard'), async (req, res) => {
   try {
@@ -272,6 +288,37 @@ router.put('/availability', auth, checkRole(['doctor']), async (req, res) => {
   } catch (err) {
     console.error('Update availability error:', err);
     res.status(500).json({ message: 'Error updating availability' });
+  }
+});
+
+// Update doctor profile
+router.put('/profile', auth, checkRole(['doctor']), async (req, res) => {
+  try {
+    const doctor = await Doctor.findOne({ user: req.user.userId });
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor profile not found' });
+    }
+
+    // Update allowed fields
+    const allowedUpdates = [
+      'name',
+      'specialization',
+      'experience',
+      'location',
+      'availability'
+    ];
+
+    allowedUpdates.forEach(field => {
+      if (req.body[field] !== undefined) {
+        doctor[field] = req.body[field];
+      }
+    });
+
+    await doctor.save();
+    res.json(doctor);
+  } catch (error) {
+    console.error('Update doctor profile error:', error);
+    res.status(500).json({ message: 'Error updating doctor profile' });
   }
 });
 

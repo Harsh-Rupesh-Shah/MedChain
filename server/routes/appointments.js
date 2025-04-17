@@ -6,7 +6,6 @@ import { sendAppointmentEmail } from '../utils/email.js';
 const router = express.Router();
 
 // Get available time slots for a doctor
-// Get available time slots for a doctor
 router.get('/doctors/:doctorId/slots', auth, async (req, res) => {
   try {
     const { date } = req.query;
@@ -19,7 +18,7 @@ router.get('/doctors/:doctorId/slots', auth, async (req, res) => {
     }
 
     // Get day of week from date
-    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'monday' }).toLowerCase();
+    const dayOfWeek = new Date(date).toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
     
     // Get doctor's availability for that day
     const dayAvailability = doctor.availability.find(a => a.day === dayOfWeek);
@@ -28,6 +27,11 @@ router.get('/doctors/:doctorId/slots', auth, async (req, res) => {
       return res.json({ slots: [] });
     }
 
+    // Get current time
+    const now = new Date();
+    const selectedDate = new Date(date);
+    const isToday = selectedDate.toDateString() === now.toDateString();
+
     // Get existing appointments for that date
     const existingAppointments = await Appointment.find({
       doctor: doctor._id,
@@ -35,16 +39,27 @@ router.get('/doctors/:doctorId/slots', auth, async (req, res) => {
         $gte: new Date(date),
         $lt: new Date(new Date(date).setDate(new Date(date).getDate() + 1))
       },
-      status: 'scheduled'
+      status: { $ne: 'cancelled' }
     });
 
-    // Filter out booked slots
-    const availableSlots = dayAvailability.slots.filter(slot => 
-      !existingAppointments.some(apt => 
+    // Filter out booked slots and past time slots
+    const availableSlots = dayAvailability.slots.filter(slot => {
+      // Check if slot is not booked
+      const isBooked = existingAppointments.some(apt => 
         apt.timeSlot.startTime === slot.startTime &&
         apt.timeSlot.endTime === slot.endTime
-      )
-    );
+      );
+
+      // If it's today, check if the slot time hasn't passed
+      if (isToday) {
+        const [hours, minutes] = slot.startTime.split(':');
+        const slotTime = new Date(selectedDate);
+        slotTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        return !isBooked && slotTime > now;
+      }
+
+      return !isBooked;
+    });
 
     res.json({ slots: availableSlots });
   } catch (error) {
@@ -56,7 +71,7 @@ router.get('/doctors/:doctorId/slots', auth, async (req, res) => {
 // Create new appointment
 router.post('/', auth, async (req, res) => {
   try {
-    const { doctorId, patientId, date, timeSlot, type, notes } = req.body;
+    const { doctorId, date, timeSlot, type, notes } = req.body;
 
     // Get the doctor by user ID
     const doctor = await Doctor.findOne({ user: doctorId });
@@ -64,8 +79,8 @@ router.post('/', auth, async (req, res) => {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
-    // Get the patient
-    const patient = await Patient.findById(patientId);
+    // Get the patient from the authenticated user
+    const patient = await Patient.findOne({ user: req.user.userId });
     if (!patient) {
       return res.status(404).json({ message: 'Patient not found' });
     }
@@ -83,6 +98,15 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Time slot not available' });
     }
 
+    // Check if slot time hasn't passed
+    const [hours, minutes] = timeSlot.startTime.split(':');
+    const slotTime = new Date(date);
+    slotTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    
+    if (slotTime < new Date()) {
+      return res.status(400).json({ message: 'Cannot book past time slots' });
+    }
+
     // Create appointment
     const appointment = new Appointment({
       patient: patient._id,
@@ -96,7 +120,7 @@ router.post('/', auth, async (req, res) => {
 
     // Send email notifications
     const doctorUser = await User.findById(doctorId);
-    const patientUser = await User.findById(patient.user);
+    const patientUser = await User.findById(req.user.userId);
 
     if (doctorUser && patientUser) {
       const appointmentDetails = {
@@ -138,16 +162,41 @@ router.post('/', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-// Get appointments for authenticated user
+
+// Get appointments (with automatic cleanup of past appointments)
 router.get('/', auth, async (req, res) => {
   try {
-    let query;
-    if (req.user.role === 'patient') {
-      const patient = await Patient.findOne({ user: req.user.userId });
-      query = { patient: patient._id };
-    } else {
+    // Clean up past appointments
+    const now = new Date();
+    await Appointment.deleteMany({
+      $or: [
+        {
+          date: { $lt: now },
+          status: 'scheduled'
+        },
+        {
+          date: now.toDateString(),
+          'timeSlot.startTime': { 
+            $lt: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+          },
+          status: 'scheduled'
+        }
+      ]
+    });
+
+    // Get current appointments
+    let query = {};
+    
+    if (req.user.role === 'doctor') {
       const doctor = await Doctor.findOne({ user: req.user.userId });
-      query = { doctor: doctor._id };
+      if (doctor) {
+        query.doctor = doctor._id;
+      }
+    } else if (req.user.role === 'patient') {
+      const patient = await Patient.findOne({ user: req.user.userId });
+      if (patient) {
+        query.patient = patient._id;
+      }
     }
 
     const appointments = await Appointment.find(query)
@@ -161,5 +210,45 @@ router.get('/', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// Cancel appointment
+router.put('/:id/cancel', auth, async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    // Check if appointment time has passed
+    const [hours, minutes] = appointment.timeSlot.startTime.split(':');
+    const appointmentTime = new Date(appointment.date);
+    appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    
+    if (appointmentTime < new Date()) {
+      return res.status(400).json({ message: 'Cannot cancel past appointments' });
+    }
+
+    // Check if user has permission to cancel
+    const isDoctor = await Doctor.findOne({ user: req.user.userId });
+    const isPatient = await Patient.findOne({ user: req.user.userId });
+
+    if (
+      (!isDoctor || isDoctor._id.toString() !== appointment.doctor.toString()) &&
+      (!isPatient || isPatient._id.toString() !== appointment.patient.toString())
+    ) {
+      return res.status(403).json({ message: 'Not authorized to cancel this appointment' });
+    }
+
+    appointment.status = 'cancelled';
+    await appointment.save();
+
+    res.json({ message: 'Appointment cancelled successfully' });
+  } catch (error) {
+    console.error('Cancel appointment error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 export default router;
