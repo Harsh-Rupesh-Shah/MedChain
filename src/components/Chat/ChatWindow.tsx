@@ -39,15 +39,51 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     loadChatHistory();
+
+    // Socket event listeners
     socket.on('new_message', handleNewMessage);
     socket.on('typing', handleTypingStatus);
+    socket.on('stop_typing', () => setIsTyping(false));
+
+    // Play notification sound for new messages
+    const audio = new Audio('/notification.mp3');
+    socket.on('new_message', (message: Message) => {
+      if (message.sender._id === receiverId) {
+        audio.play().catch(err => console.log('Audio play failed:', err));
+        
+        // Show toast notification
+        toast.custom((t) => (
+          <div className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {message.sender.name}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {message.content}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ), {
+          duration: 3000,
+          position: 'top-right',
+        });
+      }
+    });
 
     return () => {
       socket.off('new_message');
       socket.off('typing');
+      socket.off('stop_typing');
     };
   }, [receiverId]);
 
@@ -70,6 +106,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
       setMessages(prev => [...prev, message]);
       scrollToBottom();
       if (message.sender._id === receiverId) {
+        setUnreadCount(prev => prev + 1);
         markMessagesAsRead();
       }
     }
@@ -85,6 +122,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
   const markMessagesAsRead = async () => {
     try {
       await api.put(`/messages/read/${receiverId}`);
+      setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark messages as read:', error);
     }
@@ -99,6 +137,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
 
     try {
       const response = await api.post('/messages', {
+        receiverId,
+        content: newMessage
+      });
+
+      // Emit socket event
+      socket.emit('private_message', {
         receiverId,
         content: newMessage
       });
@@ -138,9 +182,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
         <div>
           <h3 className="font-semibold text-lg">{receiverName}</h3>
           {isTyping && (
-            <span className="text-sm text-slate-500">typing...</span>
+            <div className="flex items-center text-sm text-slate-500">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              typing...
+            </div>
           )}
         </div>
+        {unreadCount > 0 && (
+          <span className="bg-indigo-500 text-white text-xs px-2 py-1 rounded-full">
+            {unreadCount} new
+          </span>
+        )}
       </div>
 
       {/* Messages */}
@@ -201,10 +257,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId, receiverName }) => 
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(e) => {
+              setNewMessage(e.target.value);
+              handleTyping();
+            }}
             onKeyPress={(e) => {
               if (e.key === 'Enter') handleSend();
-              handleTyping();
             }}
             placeholder="Type a message..."
             className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"

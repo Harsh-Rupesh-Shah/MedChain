@@ -3,32 +3,30 @@ import { Calendar, Clock, Video, AlertCircle, Plus, X } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
 
+interface Doctor {
+  _id: string;
+  name: string;
+  specialization: string;
+}
+
+interface TimeSlot {
+  startTime: string;
+  endTime: string;
+}
+
 interface Appointment {
   _id: string;
-  patient: {
-    _id: string;
-    name: string;
-  };
   doctor: {
     _id: string;
     name: string;
     specialization: string;
   };
   date: string;
-  timeSlot: {
-    startTime: string;
-    endTime: string;
-  };
+  timeSlot: TimeSlot;
   type: 'in-person' | 'video';
   status: 'scheduled' | 'completed' | 'cancelled';
   notes?: string;
   meetLink?: string;
-}
-
-interface Doctor {
-  _id: string;
-  name: string;
-  specialization: string;
 }
 
 const AppointmentSystem = () => {
@@ -36,7 +34,7 @@ const AppointmentSystem = () => {
   const [showSchedule, setShowSchedule] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState<{ startTime: string; endTime: string; }[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [newAppointment, setNewAppointment] = useState({
     doctorId: '',
     date: new Date().toISOString().split('T')[0],
@@ -84,7 +82,7 @@ const AppointmentSystem = () => {
     if (!newAppointment.doctorId || !newAppointment.date) return;
     
     try {
-      const response = await api.get(`/doctors/${newAppointment.doctorId}/slots`, {
+      const response = await api.get(`/appointments/doctors/${newAppointment.doctorId}/slots`, {
         params: { date: newAppointment.date }
       });
       setAvailableSlots(response.data.slots || []);
@@ -127,7 +125,7 @@ const AppointmentSystem = () => {
 
   const handleCancel = async (appointmentId: string) => {
     try {
-      await api.put(`/appointments/${appointmentId}/status`, { status: 'cancelled' });
+      await api.put(`/appointments/${appointmentId}/cancel`);
       toast.success('Appointment cancelled successfully');
       loadAppointments();
     } catch (error) {
