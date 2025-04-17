@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Search, Send, Paperclip, Image } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
-import { socket } from '../../services/socket';
+import { socket, joinRoom } from '../../services/socket';
 
 interface User {
   _id: string;
@@ -28,16 +28,32 @@ const MessagingSystem = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadAvailableUsers();
-    setupSocketListeners();
+    
+    // Join user's room for receiving messages
+    if (user?._id) {
+      joinRoom(user._id);
+    }
+
+    // Socket event listeners
+    socket.on('new_message', (message: Message) => {
+      console.log('Received new message:', message);
+      setMessages(prev => [...prev, message]);
+      scrollToBottom();
+      
+      // Show notification if message is from selected user
+      if (message.sender._id === selectedUser) {
+        toast.success(`New message from ${message.sender.name}`);
+      }
+    });
 
     return () => {
       socket.off('new_message');
-      socket.off('message_read');
     };
-  }, []);
+  }, [user?._id, selectedUser]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -45,29 +61,13 @@ const MessagingSystem = () => {
     }
   }, [selectedUser]);
 
-  const setupSocketListeners = () => {
-    socket.on('new_message', (message: Message) => {
-      if (
-        message.sender._id === selectedUser || 
-        message.receiver._id === selectedUser
-      ) {
-        setMessages(prev => [...prev, message]);
-      }
-    });
-
-    socket.on('message_read', ({ messageIds }) => {
-      setMessages(prev => 
-        prev.map(msg => 
-          messageIds.includes(msg._id) ? { ...msg, read: true } : msg
-        )
-      );
-    });
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const loadAvailableUsers = async () => {
     try {
       setLoading(true);
-      // Load doctors for patients, and patients for doctors
       const endpoint = user?.role === 'patient' ? '/doctors' : '/doctors/patients';
       const response = await api.get(endpoint);
       setAvailableUsers(response.data);
@@ -82,6 +82,7 @@ const MessagingSystem = () => {
     try {
       const response = await api.get(`/messages/${userId}`);
       setMessages(response.data);
+      scrollToBottom();
       markMessagesAsRead(userId);
     } catch (error) {
       toast.error('Failed to load messages');
@@ -100,19 +101,25 @@ const MessagingSystem = () => {
     if (!selectedUser || !newMessage.trim()) return;
 
     try {
-      const response = await api.post('/messages', {
+      const messageData = {
         receiverId: selectedUser,
         content: newMessage.trim()
-      });
+      };
 
+      const response = await api.post('/messages', messageData);
+      
+      // Add the new message to the messages array
       setMessages(prev => [...prev, response.data]);
       setNewMessage('');
-      
+      scrollToBottom();
+
       // Emit socket event
       socket.emit('private_message', {
         receiverId: selectedUser,
         content: newMessage.trim()
       });
+
+      toast.success('Message sent');
     } catch (error) {
       toast.error('Failed to send message');
     }
@@ -195,6 +202,7 @@ const MessagingSystem = () => {
                   </div>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
