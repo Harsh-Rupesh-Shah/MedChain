@@ -102,3 +102,61 @@ body {
 .id-scanner {
   @apply rounded-lg overflow-hidden shadow-lg border-4 border-emerald-500;
 }
+
+/* Typing Indicator */
+.typing-indicator {
+  @apply inline-flex items-center space-x-1;
+}
+
+.typing-indicator span {
+  @apply w-1.5 h-1.5 bg-slate-400 rounded-full;
+  animation: typing 1s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Message Animation */
+.animate-enter {
+  animation: enter 0.2s ease-out;
+}
+
+.animate-leave {
+  animation: leave 0.15s ease-in forwards;
+}
+
+@keyframes enter {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes leave {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}

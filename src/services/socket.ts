@@ -2,21 +2,49 @@ import { io } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-console.log('Connecting to socket at:', SOCKET_URL);
-
-export const socket = io(SOCKET_URL, {
+let socket = io(SOCKET_URL, {
   autoConnect: false,
-  auth: {
-    token: localStorage.getItem('token')
-  },
-  path: '/socket.io'
+  transports: ['websocket', 'polling']
 });
 
 export const connectSocket = () => {
   if (!socket.connected) {
-    socket.auth = { token: localStorage.getItem('token') };
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found for socket connection');
+      return;
+    }
+
+    // Disconnect existing socket if any
+    if (socket) {
+      socket.disconnect();
+    }
+
+    // Create new socket instance with auth token
+    socket = io(SOCKET_URL, {
+      autoConnect: false,
+      transports: ['websocket', 'polling'],
+      auth: { token }
+    });
+
+    // Set up event listeners
+    socket.on('connect', () => {
+      console.log('Socket connected successfully');
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+    });
+
+    // Connect the socket
     socket.connect();
   }
+
+  return socket;
 };
 
 export const disconnectSocket = () => {
@@ -25,16 +53,10 @@ export const disconnectSocket = () => {
   }
 };
 
-socket.on('connect_error', (err) => {
-  console.error('Socket connection error:', err.message);
-});
+export const joinRoom = (userId: string) => {
+  if (socket.connected) {
+    socket.emit('join_room', { userId });
+  }
+};
 
-socket.on('connect', () => {
-  console.log('Socket connected successfully');
-});
-
-socket.on('disconnect', (reason) => {
-  console.log('Socket disconnected:', reason);
-});
-
-export default socket;
+export { socket };

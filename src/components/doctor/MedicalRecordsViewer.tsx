@@ -16,9 +16,15 @@ interface MedicalRecord {
   description: string;
   attachments: {
     filename: string;
+    originalName: string;
     path: string;
+    mimetype: string;
   }[];
   patient: Patient;
+  doctor: {
+    _id: string;
+    name: string;
+  };
 }
 
 const MedicalRecordsViewer = () => {
@@ -36,15 +42,21 @@ const MedicalRecordsViewer = () => {
   useEffect(() => {
     if (selectedPatient) {
       loadRecords(selectedPatient);
+    } else {
+      setRecords([]);
     }
   }, [selectedPatient]);
 
   const loadPatients = async () => {
     try {
+      setLoading(true);
       const response = await api.get('/doctors/patients');
       setPatients(response.data);
     } catch (error) {
+      console.error('Failed to load patients:', error);
       toast.error('Failed to load patients');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,8 +64,10 @@ const MedicalRecordsViewer = () => {
     try {
       setLoading(true);
       const response = await api.get(`/doctors/patients/${patientId}/records`);
+      console.log('Loaded records:', response.data); // Debug log
       setRecords(response.data);
     } catch (error) {
+      console.error('Failed to load medical records:', error);
       toast.error('Failed to load medical records');
     } finally {
       setLoading(false);
@@ -62,7 +76,7 @@ const MedicalRecordsViewer = () => {
 
   const handleDownload = async (recordId: string, filename: string) => {
     try {
-      const response = await api.get(`/medical-records/${recordId}/download`, {
+      const response = await api.get(`/medical-records/${recordId}/download/${filename}`, {
         responseType: 'blob'
       });
       
@@ -74,6 +88,7 @@ const MedicalRecordsViewer = () => {
       link.click();
       link.remove();
     } catch (error) {
+      console.error('Failed to download file:', error);
       toast.error('Failed to download file');
     }
   };
@@ -127,6 +142,7 @@ const MedicalRecordsViewer = () => {
             <option value="lab_result">Lab Results</option>
             <option value="diagnosis">Diagnoses</option>
             <option value="vaccination">Vaccinations</option>
+            <option value="other">Other</option>
           </select>
         </div>
       )}
@@ -137,50 +153,50 @@ const MedicalRecordsViewer = () => {
         </div>
       ) : selectedPatient ? (
         <div className="space-y-4">
-          {filteredRecords.map((record) => (
-            <div key={record._id} className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{record.title}</h3>
-                  <p className="text-sm text-slate-600">
-                    {new Date(record.date).toLocaleDateString()}
-                  </p>
-                  <span className="inline-block px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800 mt-2">
-                    {record.type}
-                  </span>
+          {filteredRecords.length > 0 ? (
+            filteredRecords.map((record) => (
+              <div key={record._id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold">{record.title}</h3>
+                    <p className="text-sm text-slate-600">
+                      {new Date(record.date).toLocaleDateString()}
+                    </p>
+                    <span className="inline-block px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800 mt-2">
+                      {record.type}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              
-              <p className="mt-4 text-slate-700">{record.description}</p>
+                
+                <p className="mt-4 text-slate-700">{record.description}</p>
 
-              {record.attachments.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="font-medium text-sm">Attachments:</p>
-                  {record.attachments.map((attachment, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between bg-slate-50 p-2 rounded"
-                    >
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 text-slate-400 mr-2" />
-                        <span className="text-sm">{attachment.filename}</span>
-                      </div>
-                      <button
-                        onClick={() => handleDownload(record._id, attachment.filename)}
-                        className="p-1 hover:bg-slate-200 rounded"
+                {record.attachments && record.attachments.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="font-medium text-sm">Attachments:</p>
+                    {record.attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between bg-slate-50 p-2 rounded"
                       >
-                        <Download className="h-4 w-4 text-slate-600" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {filteredRecords.length === 0 && (
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 text-slate-400 mr-2" />
+                          <span className="text-sm">{attachment.originalName || attachment.filename}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDownload(record._id, attachment.filename)}
+                          className="p-1 hover:bg-slate-200 rounded"
+                        >
+                          <Download className="h-4 w-4 text-slate-600" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
             <div className="text-center py-12 bg-white rounded-lg shadow-md">
-              <p className="text-slate-500">No medical records found</p>
+              <p className="text-slate-500">No medical records found for this patient</p>
             </div>
           )}
         </div>

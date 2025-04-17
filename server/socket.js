@@ -8,8 +8,7 @@ const initializeSocket = (server) => {
       origin: process.env.CLIENT_URL || 'http://localhost:5173',
       methods: ['GET', 'POST'],
       credentials: true
-    },
-    path: '/socket.io'
+    }
   });
 
   // Socket authentication middleware
@@ -32,14 +31,18 @@ const initializeSocket = (server) => {
     console.log('User connected:', socket.user.userId);
 
     // Join user's room
-    socket.join(`user_${socket.user.userId}`);
+    socket.on('join_room', ({ userId }) => {
+      socket.join(`user_${userId}`);
+      console.log(`User ${userId} joined their room`);
+    });
 
     socket.on('private_message', async (data) => {
       try {
         const message = new Message({
           sender: socket.user.userId,
           receiver: data.receiverId,
-          content: data.content
+          content: data.content,
+          attachments: data.attachments || []
         });
 
         await message.save();
@@ -50,12 +53,24 @@ const initializeSocket = (server) => {
         // Send to receiver's room
         io.to(`user_${data.receiverId}`).emit('new_message', populatedMessage);
         
-        // Send back to sender
-        socket.emit('new_message', populatedMessage);
+        // Send back to sender's room
+        io.to(`user_${socket.user.userId}`).emit('new_message', populatedMessage);
       } catch (error) {
         console.error('Socket message error:', error);
         socket.emit('error', { message: 'Failed to send message' });
       }
+    });
+
+    socket.on('typing', (data) => {
+      socket.to(`user_${data.receiverId}`).emit('typing', {
+        userId: socket.user.userId
+      });
+    });
+
+    socket.on('stop_typing', (data) => {
+      socket.to(`user_${data.receiverId}`).emit('stop_typing', {
+        userId: socket.user.userId
+      });
     });
 
     socket.on('disconnect', () => {
