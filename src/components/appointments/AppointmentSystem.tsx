@@ -99,38 +99,39 @@ const AppointmentSystem = () => {
       setAvailableSlots([]);
     }
   };
-  
+
   const handleSchedule = async () => {
-    if (!newAppointment.doctorId || !newAppointment.timeSlot.startTime) {
-      toast.error('Please select a doctor and time slot');
-      return;
-    }
+  if (!newAppointment.doctorId || !newAppointment.timeSlot.startTime) {
+    toast.error('Please select a doctor and time slot');
+    return;
+  }
 
-    try {
-      setLoading(true);
-      await api.post('/appointments', newAppointment);
-      toast.success('Appointment scheduled successfully');
-      setShowSchedule(false);
-      loadAppointments();
-      
-      // Reset form
-      setNewAppointment({
-        doctorId: '',
-        date: new Date().toISOString().split('T')[0],
-        timeSlot: {
-          startTime: '',
-          endTime: ''
-        },
-        type: 'in-person',
-        notes: ''
-      });
-    } catch (error) {
-      toast.error('Failed to schedule appointment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  try {
+    setLoading(true);
+    console.log('Creating appointment with data:', newAppointment);
+    await api.post('/appointments', newAppointment);
+    toast.success('Appointment scheduled successfully');
+    setShowSchedule(false);
+    loadAppointments();
+    
+    // Reset form
+    setNewAppointment({
+      doctorId: '',
+      date: new Date().toISOString().split('T')[0],
+      timeSlot: {
+        startTime: '',
+        endTime: ''
+      },
+      type: 'in-person',
+      notes: ''
+    });
+  } catch (error) {
+    console.error('Failed to schedule appointment:', error);
+    toast.error('Failed to schedule appointment');
+  } finally {
+    setLoading(false);
+  }
+};
   const handleCancel = async (appointmentId: string) => {
     try {
       await api.put(`/appointments/${appointmentId}/cancel`);

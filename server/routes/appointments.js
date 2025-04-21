@@ -108,6 +108,8 @@ router.post('/', auth, async (req, res) => {
   try {
     const { doctorId, patientId, date, timeSlot, type, notes } = req.body;
 
+    console.log('Creating appointment with data:', req.body);
+
     // Get the doctor (try both by user ID and doctor _id)
     let doctor = await Doctor.findOne({ user: doctorId });
     if (!doctor) {
@@ -128,18 +130,45 @@ router.post('/', auth, async (req, res) => {
       // For patient-side scheduling
       patient = await Patient.findOne({ user: req.user.userId });
     }
-
+    
     if (!patient) {
       return res.status(404).json({ message: 'Patient not found' });
     }
 
-    // Rest of the appointment creation logic remains the same...
-    // [Keep the existing code for slot checking and appointment creation]
+    // Check if the selected time slot is available
+    const existingAppointments = await Appointment.find({
+      doctor: doctor._id,
+      date,
+      'timeSlot.startTime': timeSlot.startTime,
+      'timeSlot.endTime': timeSlot.endTime,
+      status: { $ne: 'cancelled' }
+    });
+
+    if (existingAppointments.length > 0) {
+      return res.status(400).json({ message: 'Selected time slot is already booked' });
+    }
+
+    // Create the appointment
+    const appointment = new Appointment({
+      patient: patient._id,
+      doctor: doctor._id,
+      date,
+      timeSlot,
+      type,
+      notes
+    });
+
+    await appointment.save();
+    res.status(201).json(appointment);
   } catch (error) {
     console.error('Create appointment error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Validation error', errors: error.errors });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 // Get appointments (with automatic cleanup of past appointments)
 router.get('/', auth, async (req, res) => {
   try {
