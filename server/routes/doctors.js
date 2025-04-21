@@ -305,7 +305,15 @@ router.put('/profile', auth, checkRole(['doctor']), async (req, res) => {
       'specialization',
       'experience',
       'location',
-      'availability'
+      'availability',
+      'phone', // Add phone to the allowed updates
+      'address', // Add address to the allowed updates
+      'dateOfBirth', // Add dateOfBirth to the allowed updates
+      'gender', // Add gender to the allowed updates
+      'bloodGroup', // Add bloodGroup to the allowed updates
+      'allergies', // Add allergies to the allowed updates
+      'chronicConditions', // Add chronicConditions to the allowed updates
+      'emergencyContact' // Add emergencyContact to the allowed updates
     ];
 
     allowedUpdates.forEach(field => {
@@ -315,7 +323,12 @@ router.put('/profile', auth, checkRole(['doctor']), async (req, res) => {
     });
 
     await doctor.save();
-    res.json(doctor);
+
+    // Return the updated doctor profile
+    const updatedDoctor = await Doctor.findOne({ user: req.user.userId })
+      .populate('user', 'email');
+
+    res.json(updatedDoctor);
   } catch (error) {
     console.error('Update doctor profile error:', error);
     res.status(500).json({ message: 'Error updating doctor profile' });

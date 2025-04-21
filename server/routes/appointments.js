@@ -214,8 +214,6 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-
-
 // Get appointments (with automatic cleanup of past appointments)
 router.get('/', auth, async (req, res) => {
   try {
