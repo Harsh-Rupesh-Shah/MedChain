@@ -18,10 +18,10 @@ const createTransporter = () => {
 
 // Function to generate a Google Meet link
 const generateGoogleMeetLink = () => {
-  const chars = 'abcdefghijklmnopqrstuvwxyz';
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let meetCode = '';
   for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
+    for (let j = 0; j < 4; j++) {
       meetCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     if (i < 2) meetCode += '-';
@@ -29,14 +29,14 @@ const generateGoogleMeetLink = () => {
   return `https://meet.google.com/${meetCode}`;
 };
 
-export const sendAppointmentEmail = async (to, subject, appointmentDetails) => {
+const sendAppointmentEmail = async (to, subject, appointmentDetails) => {
   const { doctorName, patientName, date, timeSlot, type } = appointmentDetails;
   const meetLink = type === 'video' ? generateGoogleMeetLink() : null;
 
   const emailContent = `
     Dear ${to.includes('doctor') ? doctorName : patientName},
 
-    ${to.includes('doctor') ? 
+    ${to.includes('doctor') ?
       `A new appointment has been scheduled with patient ${patientName}` :
       `Your appointment has been scheduled with Dr. ${doctorName}`
     }
@@ -80,6 +80,7 @@ export const sendAppointmentEmail = async (to, subject, appointmentDetails) => {
       html: emailContent.replace(/\n/g, '<br>')
     });
 
+    console.log('Email sent successfully to:', to);
     return meetLink;
   } catch (err) {
     console.error('Email sending failed:', err);
@@ -88,3 +89,5 @@ export const sendAppointmentEmail = async (to, subject, appointmentDetails) => {
     return type === 'video' ? generateGoogleMeetLink() : null;
   }
 };
+
+export { sendAppointmentEmail, generateGoogleMeetLink };
