@@ -18,7 +18,7 @@ const createTransporter = () => {
 
 // Function to generate a Google Meet link
 const generateGoogleMeetLink = () => {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const chars = 'abcdefghijklmnopqrstuvwxyz';
   let meetCode = '';
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < 4; j++) {
@@ -28,6 +28,7 @@ const generateGoogleMeetLink = () => {
   }
   return `https://meet.google.com/${meetCode}`;
 };
+
 
 const sendAppointmentEmail = async (to, subject, appointmentDetails) => {
   const { doctorName, patientName, date, timeSlot, type } = appointmentDetails;
