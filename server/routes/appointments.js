@@ -1,7 +1,7 @@
 import express from 'express';
 import { auth, checkRole } from '../middleware/auth.js';
 import { Appointment, Doctor, User, Patient } from '../models/index.js';
-import { sendAppointmentEmail } from '../utils/email.js';
+import { sendAppointmentEmail, generateGoogleMeetLink } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -103,7 +103,7 @@ router.get('/doctors/:doctorId/slots', auth, async (req, res) => {
   }
 });
 
-// Create new appointment - Updated version
+// Create new appointment
 router.post('/', auth, async (req, res) => {
   try {
     const { doctorId, patientId, date, timeSlot, type, notes } = req.body;
@@ -111,9 +111,9 @@ router.post('/', auth, async (req, res) => {
     console.log('Creating appointment with data:', req.body);
 
     // Get the doctor (try both by user ID and doctor _id)
-    let doctor = await Doctor.findOne({ user: doctorId });
+    let doctor = await Doctor.findOne({ user: doctorId }).populate('user', 'email');
     if (!doctor) {
-      doctor = await Doctor.findById(doctorId);
+      doctor = await Doctor.findById(doctorId).populate('user', 'email');
     }
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor not found' });
@@ -122,18 +122,22 @@ router.post('/', auth, async (req, res) => {
     // Get the patient (for doctor-side scheduling)
     let patient;
     if (patientId) {
-      patient = await Patient.findOne({ user: patientId });
+      patient = await Patient.findOne({ user: patientId }).populate('user', 'email');
       if (!patient) {
-        patient = await Patient.findById(patientId);
+        patient = await Patient.findById(patientId).populate('user', 'email');
       }
     } else {
       // For patient-side scheduling
-      patient = await Patient.findOne({ user: req.user.userId });
+      patient = await Patient.findOne({ user: req.user.userId }).populate('user', 'email');
     }
-    
+
     if (!patient) {
       return res.status(404).json({ message: 'Patient not found' });
     }
+
+    // Log the patient and user objects to debug
+    console.log('Patient object:', patient);
+    console.log('User object associated with patient:', patient.user);
 
     // Check if the selected time slot is available
     const existingAppointments = await Appointment.find({
@@ -159,6 +163,47 @@ router.post('/', auth, async (req, res) => {
     });
 
     await appointment.save();
+
+    // Generate Google Meet link if the appointment type is video
+    let meetLink = null;
+    if (type === 'video') {
+      meetLink = generateGoogleMeetLink();
+    }
+
+    // Prepare email details
+    const appointmentDetails = {
+      doctorName: doctor.name,
+      patientName: patient.name,
+      date: appointment.date,
+      timeSlot: appointment.timeSlot,
+      type: appointment.type,
+      meetLink: meetLink
+    };
+
+    // Send email to patient
+    const patientEmail = patient.user.email; // Ensure this is a string
+    console.log('Patient email:', patientEmail);
+
+    if (!patientEmail) {
+      console.error('Patient email is undefined');
+      return res.status(500).json({ message: 'Failed to send email to patient' });
+    }
+
+    const patientSubject = 'Appointment Scheduled';
+    await sendAppointmentEmail(patientEmail, patientSubject, appointmentDetails);
+
+    // Send email to doctor
+    const doctorEmail = doctor.user.email; // Ensure this is a string
+    console.log('Doctor email:', doctorEmail);
+
+    if (!doctorEmail) {
+      console.error('Doctor email is undefined');
+      return res.status(500).json({ message: 'Failed to send email to doctor' });
+    }
+
+    const doctorSubject = 'New Appointment Scheduled';
+    await sendAppointmentEmail(doctorEmail, doctorSubject, appointmentDetails);
+
     res.status(201).json(appointment);
   } catch (error) {
     console.error('Create appointment error:', error);
@@ -168,6 +213,8 @@ router.post('/', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
 
 // Get appointments (with automatic cleanup of past appointments)
 router.get('/', auth, async (req, res) => {
