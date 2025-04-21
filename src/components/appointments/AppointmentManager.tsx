@@ -88,20 +88,28 @@ const AppointmentManager = () => {
     }
   };
 
+  // Update the loadAvailableSlots function
   const loadAvailableSlots = async () => {
-    if (!user?._id) return;
+    if (!user?._id || !newAppointment.date) return;
     
     try {
+      console.log('Loading slots for doctor (user):', user._id, 'date:', newAppointment.date);
       const response = await api.get(`/appointments/doctors/${user._id}/slots`, {
-        params: { date: newAppointment.date }
+        params: { 
+          date: newAppointment.date,
+          // Add cache busting if needed
+          _: Date.now() 
+        }
       });
+      console.log('Received slots:', response.data.slots);
       setAvailableSlots(response.data.slots || []);
     } catch (error) {
       console.error('Failed to load slots:', error);
+      toast.error('Failed to load available time slots');
       setAvailableSlots([]);
     }
   };
-
+  
   const handleSchedule = async () => {
     if (!newAppointment.patientId || !newAppointment.timeSlot.startTime) {
       toast.error('Please select a patient and time slot');
