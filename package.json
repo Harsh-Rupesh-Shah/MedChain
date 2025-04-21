@@ -12,6 +12,7 @@
     "dev:server": "nodemon server/index.js"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@tensorflow/tfjs": "^4.17.0",
     "axios": "^1.6.7",
     "bcryptjs": "^2.4.3",
