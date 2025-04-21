@@ -1,33 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, User, FileText } from 'lucide-react';
-import { doctors } from '../services/api';
+import api from '../../services/api';
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../../hooks/useAuth';
 
-interface TimeSlot {
-  startTime: string;
-  endTime: string;
-}
-
-interface Doctor {
-  _id: string;
-  name: string;
-  specialization: string;
-  availability: {
-    day: string;
-    slots: TimeSlot[];
-  }[];
-}
-
-interface AppointmentSchedulerProps {
-  onSchedule: (appointment: any) => Promise<void>;
-}
-
-const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule }) => {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedDoctor, setSelectedDoctor] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-  const [appointmentType, setAppointmentType] = useState<'in-person' | 'video'>('in-person');
-  const [symptoms, setSymptoms] = useState<string>('');
-  const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([]);
+const AppointmentScheduler = ({ onSchedule }) => {
+  const { user } = useAuth();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
+  const [appointmentType, setAppointmentType] = useState('in-person');
+  const [symptoms, setSymptoms] = useState('');
+  const [availableDoctors, setAvailableDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,10 +21,10 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
   const loadDoctors = async () => {
     try {
       setLoading(true);
-      const response = await doctors.getAll();
+      const response = await api.get('/doctors');
       setAvailableDoctors(response.data);
-    } catch (err) {
-      console.error('Failed to load doctors:', err);
+    } catch (error) {
+      toast.error('Failed to load doctors');
     } finally {
       setLoading(false);
     }
@@ -48,39 +32,59 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
 
   const getAvailableTimeSlots = () => {
     if (!selectedDoctor) return [];
-    
+
     const doctor = availableDoctors.find(d => d._id === selectedDoctor);
     if (!doctor) return [];
 
     const dayOfWeek = selectedDate.toLocaleLowerCase();
     const availability = doctor.availability.find(a => a.day === dayOfWeek);
-    
-    return availability?.slots.filter(slot => !slot.isBooked) || [];
+
+    if (!availability) return [];
+
+    const existingAppointments = appointments.filter(apt =>
+      apt.doctor._id === selectedDoctor &&
+      new Date(apt.date).toDateString() === selectedDate.toDateString()
+    );
+
+    return availability.slots.filter(slot => {
+      const isBooked = existingAppointments.some(apt =>
+        apt.timeSlot.startTime === slot.startTime &&
+        apt.timeSlot.endTime === slot.endTime
+      );
+
+      const isPastTime = new Date(`${selectedDate.toDateString()} ${slot.startTime}`) < new Date();
+
+      return !isBooked && !isPastTime;
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedDoctor || !selectedTimeSlot) return;
 
     try {
-      await onSchedule({
+      const appointmentData = {
         doctorId: selectedDoctor,
         date: selectedDate,
         timeSlot: selectedTimeSlot,
         type: appointmentType,
         symptoms: symptoms.split('\n')
-      });
-    } catch (err) {
-      console.error('Failed to schedule appointment:', err);
+      };
+
+      console.log('Scheduling appointment with data:', appointmentData);
+
+      await onSchedule(appointmentData);
+      toast.success('Appointment scheduled successfully');
+    } catch (error) {
+      toast.error('Failed to schedule appointment');
+      console.error('Error scheduling appointment:', error);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <h2 className="text-2xl font-bold mb-6">Schedule Appointment</h2>
-
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Doctor Selection */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Select Doctor
@@ -100,7 +104,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
           </select>
         </div>
 
-        {/* Date Selection */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Select Date
@@ -118,7 +121,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
           </div>
         </div>
 
-        {/* Time Slot Selection */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Select Time Slot
@@ -135,14 +137,13 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
                     : 'border-slate-200 hover:border-indigo-500'
                 }`}
               >
-                <Clock className="h-4 w-4 inline-block mr-1" />
+                <Clock className="h-4 w-4 mr-1 inline" />
                 {slot.startTime} - {slot.endTime}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Appointment Type */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Appointment Type
@@ -157,7 +158,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
                   : 'border-slate-200 hover:border-indigo-500'
               }`}
             >
-              <User className="h-5 w-5 mx-auto mb-2" />
               In-Person
             </button>
             <button
@@ -169,13 +169,11 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
                   : 'border-slate-200 hover:border-indigo-500'
               }`}
             >
-              <Video className="h-5 w-5 mx-auto mb-2" />
               Video Call
             </button>
           </div>
         </div>
 
-        {/* Symptoms */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Symptoms & Notes
@@ -188,7 +186,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({ onSchedule 
               placeholder="Describe your symptoms..."
               required
             />
-            <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
           </div>
         </div>
 
