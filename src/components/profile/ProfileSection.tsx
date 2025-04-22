@@ -57,7 +57,7 @@ const ProfileSection = () => {
       setLoading(true);
       const endpoint = user?.role === 'doctor' ? '/doctors/profile' : '/patients/profile';
       const response = await api.get(endpoint);
-      
+
       // Ensure all required fields exist with default values
       const profileData = {
         ...defaultProfile,
@@ -67,7 +67,7 @@ const ProfileSection = () => {
           ...response.data.emergencyContact
         }
       };
-      
+
       setProfile(profileData);
       setEditedProfile(profileData);
     } catch (error) {
@@ -84,7 +84,7 @@ const ProfileSection = () => {
       setLoading(true);
       const endpoint = user?.role === 'doctor' ? '/doctors/profile' : '/patients/profile';
       const response = await api.put(endpoint, editedProfile);
-      
+
       // Ensure all required fields exist with default values
       const updatedProfile = {
         ...defaultProfile,
@@ -94,7 +94,7 @@ const ProfileSection = () => {
           ...response.data.emergencyContact
         }
       };
-      
+
       setProfile(updatedProfile);
       setEditing(false);
       toast.success('Profile updated successfully');
@@ -158,7 +158,7 @@ const ProfileSection = () => {
           {/* Basic Information */}
           <div className="space-y-6">
             <h3 className="text-lg font-semibold">Basic Information</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Full Name
@@ -271,7 +271,7 @@ const ProfileSection = () => {
           {/* Medical Information */}
           <div className="space-y-6">
             <h3 className="text-lg font-semibold">Medical Information</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Date of Birth
@@ -344,9 +344,9 @@ const ProfileSection = () => {
                     <input
                       type="text"
                       value={editedProfile.allergies.join(', ')}
-                      onChange={(e) => setEditedProfile({ 
-                        ...editedProfile, 
-                        allergies: e.target.value.split(',').map(item => item.trim()) 
+                      onChange={(e) => setEditedProfile({
+                        ...editedProfile,
+                        allergies: e.target.value.split(',').map(item => item.trim())
                       })}
                       className="input-field"
                       placeholder="Separate allergies with commas"
@@ -364,9 +364,9 @@ const ProfileSection = () => {
                     <input
                       type="text"
                       value={editedProfile.chronicConditions.join(', ')}
-                      onChange={(e) => setEditedProfile({ 
-                        ...editedProfile, 
-                        chronicConditions: e.target.value.split(',').map(item => item.trim()) 
+                      onChange={(e) => setEditedProfile({
+                        ...editedProfile,
+                        chronicConditions: e.target.value.split(',').map(item => item.trim())
                       })}
                       className="input-field"
                       placeholder="Separate conditions with commas"
@@ -378,76 +378,76 @@ const ProfileSection = () => {
               </>
             )}
           </div>
-        </div>
 
-        {/* Emergency Contact */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">Emergency Contact</h3>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Name
-              </label>
-              {editing ? (
-                <input
-                  type="text"
-                  value={editedProfile.emergencyContact.name}
-                  onChange={(e) => setEditedProfile({
-                    ...editedProfile,
-                    emergencyContact: {
-                      ...editedProfile.emergencyContact,
-                      name: e.target.value
-                    }
-                  })}
-                  className="input-field"
-                />
-              ) : (
-                <p className="text-slate-900">{profile.emergencyContact.name || 'Not set'}</p>
-              )}
-            </div>
+          {/* Emergency Contact */}
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold mb-4">Emergency Contact</h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Name
+                </label>
+                {editing ? (
+                  <input
+                    type="text"
+                    value={editedProfile.emergencyContact.name}
+                    onChange={(e) => setEditedProfile({
+                      ...editedProfile,
+                      emergencyContact: {
+                        ...editedProfile.emergencyContact,
+                        name: e.target.value
+                      }
+                    })}
+                    className="input-field"
+                  />
+                ) : (
+                  <p className="text-slate-900">{profile.emergencyContact.name || 'Not set'}</p>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Relationship
-              </label>
-              {editing ? (
-                <input
-                  type="text"
-                  value={editedProfile.emergencyContact.relationship}
-                  onChange={(e) => setEditedProfile({
-                    ...editedProfile,
-                    emergencyContact: {
-                      ...editedProfile.emergencyContact,
-                      relationship: e.target.value
-                    }
-                  })}
-                  className="input-field"
-                />
-              ) : (
-                <p className="text-slate-900">{profile.emergencyContact.relationship || 'Not set'}</p>
-              )}
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Relationship
+                </label>
+                {editing ? (
+                  <input
+                    type="text"
+                    value={editedProfile.emergencyContact.relationship}
+                    onChange={(e) => setEditedProfile({
+                      ...editedProfile,
+                      emergencyContact: {
+                        ...editedProfile.emergencyContact,
+                        relationship: e.target.value
+                      }
+                    })}
+                    className="input-field"
+                  />
+                ) : (
+                  <p className="text-slate-900">{profile.emergencyContact.relationship || 'Not set'}</p>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Phone Number
-              </label>
-              {editing ? (
-                <input
-                  type="tel"
-                  value={editedProfile.emergencyContact.phone}
-                  onChange={(e) => setEditedProfile({
-                    ...editedProfile,
-                    emergencyContact: {
-                      ...editedProfile.emergencyContact,
-                      phone: e.target.value
-                    }
-                  })}
-                  className="input-field"
-                />
-              ) : (
-                <p className="text-slate-900">{profile.emergencyContact.phone || 'Not set'}</p>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Phone Number
+                </label>
+                {editing ? (
+                  <input
+                    type="tel"
+                    value={editedProfile.emergencyContact.phone}
+                    onChange={(e) => setEditedProfile({
+                      ...editedProfile,
+                      emergencyContact: {
+                        ...editedProfile.emergencyContact,
+                        phone: e.target.value
+                      }
+                    })}
+                    className="input-field"
+                  />
+                ) : (
+                  <p className="text-slate-900">{profile.emergencyContact.phone || 'Not set'}</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
