@@ -59,22 +59,40 @@ const Login = () => {
         return;
       }
   
-      // Convert data URL to blob
-      const response = await fetch(faceImage);
-      const blob = await response.blob();
-      const file = new File([blob], 'face-capture.jpg', { type: 'image/jpeg' });
+      // Show immediate feedback
+      toast.loading('Processing face verification...', { id: 'face-login' });
   
-      // Pass both email and image to verifyFace
+      // Convert and compress image
+      const compressedImage = await compressImage(faceImage);
+      const file = new File([compressedImage], 'face.jpg', { 
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+  
       await verifyFace(formData.email, file);
+      toast.success('Face verification successful!', { id: 'face-login' });
       
     } catch (err) {
-      console.error('Face login error:', err);
-      const message = err.message || 'Face verification failed';
-      setError(message);
-      toast.error(message);
+      toast.error(err.message || 'Face verification failed', { id: 'face-login' });
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Add this helper function
+  const compressImage = async (dataUrl: string, quality = 0.7) => {
+    return new Promise<Blob>((resolve) => {
+      const img = new Image();
+      img.src = dataUrl;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', quality);
+      };
+    });
   };
 
   return (
