@@ -33,7 +33,7 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error
       errorMessage = error.response.data?.message || 'Server error';
-      
+
       // Only redirect to login for 401 errors if not already on the login page
       if (error.response.status === 401 && !window.location.pathname.includes('/login')) {
         localStorage.removeItem('token');
@@ -60,76 +60,99 @@ export const auth = {
       throw error;
     }
   },
-  
+
   login: async (data: any, role: 'patient' | 'doctor' | 'admin') => {
     try {
       const endpoint = `/auth/${role}/login`;
       const response = await api.post(endpoint, data);
-      
+
       if (!response.data?.token || !response.data?.user) {
         throw new Error('Invalid response from server');
       }
-      
+
       // Ensure the user object has the correct role
       response.data.user.role = role;
-      
+
       return response;
     } catch (error) {
       throw error;
     }
   },
-  
+
+  // Add to your auth object in api.ts
+  faceLogin: async (email: string, faceImage: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('face', faceImage);
+
+      const response = await api.post('/auth/patient/face-login', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (!response.data?.token) {
+        throw new Error('Invalid response from server');
+      }
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   getCurrentUser: async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No token found');
       }
-      
+
       const response = await api.get('/auth/me');
       return response;
     } catch (error) {
       throw error;
     }
   },
-  
+
   verifyFace: async (faceImage: File) => {
     try {
       const formData = new FormData();
       formData.append('face', faceImage);
-      
+
       const response = await api.post('/patients/verify-face', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       if (!response.data?.token || !response.data?.user) {
         throw new Error('Invalid response from server');
       }
-      
+
       return response;
     } catch (error) {
       throw error;
     }
   },
-  
+
   verifyDoctorId: async (idCard: File) => {
     try {
       const formData = new FormData();
       formData.append('idCard', idCard);
-      
+
       const response = await api.post('/doctors/verify-id', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       if (!response.data?.verified) {
         throw new Error('ID verification failed');
       }
-      
+
       return response;
     } catch (error) {
       throw error;
     }
   }
 };
+
+
 
 export default api;

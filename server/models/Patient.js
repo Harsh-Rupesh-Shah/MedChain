@@ -71,9 +71,9 @@ const patientSchema = new mongoose.Schema({
       default: false
     }
   },
-  faceData: {
-    descriptors: [[Number]],
-    lastUpdated: Date
+  biometricData: {
+    image: String,
+    descriptors: [[Number]]
   }
 });
 
