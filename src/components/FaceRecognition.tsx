@@ -1,138 +1,107 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Camera, X } from 'lucide-react';
+// components/FaceRecognition.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { Camera, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import * as faceapi from 'face-api.js';
+import { createCanvas, loadImage } from 'canvas';
 
 interface FaceRecognitionProps {
-  onCapture: (image: File) => Promise<void>;
-  mode: 'register' | 'verify';
+  onSuccess: (image: string) => void;
+  onCancel: () => void;
 }
 
-const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onCapture, mode }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onSuccess, onCancel }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    if (isCameraActive && videoRef.current) {
+      const loadModels = async () => {
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+          faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+          faceapi.nets.faceRecognitionNet.loadFromUri('/models')
+        ]);
+      };
 
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
+      loadModels();
     }
+  }, [isCameraActive]);
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size should be less than 5MB');
-      return;
-    }
-
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedFile) {
-      toast.error('Please select an image first');
-      return;
-    }
-
+  const startCamera = async () => {
     try {
-      setLoading(true);
-      await onCapture(selectedFile);
-      
-      // Clear the selection after successful processing
-      setSelectedFile(null);
-      setPreview(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setIsCameraActive(true);
+      }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to process image';
-      toast.error(message);
-    } finally {
-      setLoading(false);
+      toast.error('Failed to access camera');
+      console.error('Camera access error:', error);
     }
   };
 
-  const clearSelection = () => {
-    setSelectedFile(null);
-    setPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const captureImage = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+
+    const dataUrl = canvasRef.current.toDataURL('image/jpeg');
+    onSuccess(dataUrl);
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      setIsCameraActive(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   return (
     <div className="relative">
-      {loading && (
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+      <video
+        ref={videoRef}
+        autoPlay
+        className="w-full h-64 object-cover rounded-lg"
+      />
+      {!isCameraActive && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+          <Camera className="h-10 w-10 text-white" />
         </div>
       )}
-
-      <div className="border-2 border-dashed border-slate-300 rounded-lg p-6">
-        {preview ? (
-          <div className="relative">
-            <img
-              src={preview}
-              alt="Face Preview"
-              className="max-w-full h-auto rounded-lg"
-            />
-            <button
-              onClick={clearSelection}
-              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <button
-              onClick={handleSubmit}
-              className="btn-primary w-full mt-4"
-              disabled={loading}
-            >
-              {loading ? 'Processing...' : mode === 'register' ? 'Register Face' : 'Verify Face'}
-            </button>
-          </div>
-        ) : (
-          <div
-            className="flex flex-col items-center justify-center cursor-pointer min-h-[400px]"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="mb-4 p-4 rounded-full bg-indigo-50">
-              <Camera className="h-12 w-12 text-indigo-500" />
-            </div>
-            <p className="text-lg font-medium text-slate-700 mb-2">
-              {mode === 'register' ? 'Register Your Face' : 'Verify Your Face'}
-            </p>
-            <p className="text-sm text-slate-500 text-center">
-              Click to upload or drag and drop<br />
-              PNG, JPG up to 5MB
-            </p>
-            <div className="flex items-center mt-4">
-              <Upload className="h-5 w-5 text-indigo-500 mr-2" />
-              <span className="text-indigo-500">Upload Image</span>
-            </div>
-          </div>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-      </div>
-
-      <div className="mt-4 text-sm text-slate-500 text-center">
-        <p>Please ensure:</p>
-        <ul className="list-disc list-inside">
-          <li>Your face is clearly visible</li>
-          <li>Good lighting conditions</li>
-          <li>No filters or edits on the photo</li>
-        </ul>
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 opacity-0"
+        width={640}
+        height={480}
+      />
+      <div className="absolute inset-x-0 bottom-0 flex justify-between px-4 py-2 bg-white/80 backdrop-blur-sm">
+        <button
+          onClick={stopCamera}
+          className="btn-secondary p-2"
+          disabled={!isCameraActive}
+        >
+          <X className="h-5 w-5" />
+          Cancel
+        </button>
+        <button
+          onClick={isCameraActive ? captureImage : startCamera}
+          className="btn-primary p-2"
+        >
+          {isCameraActive ? 'Capture' : 'Start Camera'}
+        </button>
       </div>
     </div>
   );

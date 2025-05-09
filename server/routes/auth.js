@@ -6,13 +6,20 @@ import { auth } from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { verifyFace } from '../utils/faceRecognition.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const router = express.Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
+// Configure multer for doctor ID uploads
+const doctorIdStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = 'uploads/doctor-ids';
+    const uploadDir = path.join(__dirname, '../uploads/doctor-ids');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -23,8 +30,37 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
-  storage: storage,
+// Configure multer for face image uploads
+const faceStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads/faces');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const uploadDoctorId = multer({ 
+  storage: doctorIdStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      cb(new Error('Invalid file type. Only JPEG, PNG and JPG are allowed.'));
+      return;
+    }
+    cb(null, true);
+  }
+});
+
+const uploadFace = multer({ 
+  storage: faceStorage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
@@ -39,68 +75,60 @@ const upload = multer({
 });
 
 // Patient Registration
-router.post('/patient/register',
-  [
-    body('email').isEmail().withMessage('Please enter a valid email'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-    body('name').notEmpty().withMessage('Name is required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ 
-          message: 'Validation error', 
-          errors: errors.array() 
-        });
-      }
+router.post('/patient/register', uploadFace.single('biometricData'), async (req, res) => {
+  try {
+    const { email, password, name, ...profileData } = req.body;
 
-      const { email, password, name, ...profileData } = req.body;
-
-      // Check if user exists
-      let user = await User.findOne({ email });
-      if (user) {
-        return res.status(400).json({ message: 'User already exists with this email' });
-      }
-
-      // Create user
-      user = new User({
-        email,
-        password,
-        role: 'patient',
-        verificationStatus: 'approved',
-        isVerified: true
-      });
-
-      // Create patient profile
-      const profile = new Patient({
-        user: user._id,
-        name,
-        ...profileData
-      });
-
-      await profile.save();
-      user.profile = profile._id;
-      await user.save();
-
-      res.status(201).json({
-        message: 'Patient registered successfully',
-        user: {
-          email: user.email,
-          name: profile.name,
-          role: 'patient'
-        }
-      });
-    } catch (err) {
-      console.error('Patient registration error:', err);
-      res.status(500).json({ message: 'Server error during registration' });
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: 'User already exists with this email' });
     }
+
+    // Create user
+    const newUser = new User({
+      email,
+      password,
+      role: 'patient',
+      verificationStatus: 'approved',
+      isVerified: true
+    });
+
+    // Create patient profile
+    const profile = new Patient({
+      user: newUser._id,
+      name,
+      ...profileData
+    });
+
+    // Save face image if provided
+    if (req.file) {
+      profile.biometricData = {
+        image: `/uploads/faces/${req.file.filename}`
+      };
+    }
+
+    await profile.save();
+    newUser.profile = profile._id;
+    await newUser.save();
+
+    res.status(201).json({
+      message: 'Patient registered successfully',
+      user: {
+        email: newUser.email,
+        name: profile.name,
+        role: 'patient'
+      }
+    });
+  } catch (err) {
+    console.error('Patient registration error:', err);
+    res.status(500).json({ message: 'Server error during registration' });
   }
-);
+});
 
 // Doctor Registration
 router.post('/doctor/register',
-  upload.single('idCardImage'),
+  uploadDoctorId.single('idCardImage'),
   [
     body('email').isEmail().withMessage('Please enter a valid email'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
@@ -294,23 +322,38 @@ router.post('/doctor/login',
   }
 );
 
-// Face Login (Patient only)
-router.post('/patient/face-login', upload.single('face'), async (req, res) => {
+// Face Login
+router.post('/patient/face-login', uploadFace.single('face'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'Face image is required' });
     }
 
-    // Here you would implement actual face recognition logic
-    // For now, we'll simulate with a basic check
-    const user = await User.findOne({ role: 'patient', isVerified: true });
+    const user = await User.findOne({ email: req.body.email, role: 'patient' });
     if (!user) {
-      return res.status(404).json({ message: 'No matching user found' });
+      return res.status(404).json({ message: 'Patient not found' });
     }
 
     const patient = await Patient.findOne({ user: user._id });
-    if (!patient) {
-      return res.status(404).json({ message: 'Patient profile not found' });
+    if (!patient?.biometricData?.image) {
+      return res.status(404).json({ message: 'No face data found for this patient' });
+    }
+
+    // Convert stored path to absolute path
+    let storedImagePath = patient.biometricData.image;
+    if (storedImagePath.startsWith('/')) {
+      storedImagePath = storedImagePath.substring(1);
+    }
+    storedImagePath = path.join(__dirname, '..', storedImagePath);
+
+    console.log('File existence check:');
+    console.log('Uploaded:', fs.existsSync(req.file.path));
+    console.log('Stored:', fs.existsSync(storedImagePath));
+
+    const faceMatch = await verifyFace(req.file.path, storedImagePath);
+
+    if (!faceMatch) {
+      return res.status(401).json({ message: 'Face recognition failed' });
     }
 
     const token = jwt.sign(
@@ -333,7 +376,7 @@ router.post('/patient/face-login', upload.single('face'), async (req, res) => {
     res.status(500).json({ message: 'Face verification failed' });
   }
 });
-
+// Admin Login
 router.post('/admin/login',
   [
     body('email').isEmail().withMessage('Please enter a valid email'),

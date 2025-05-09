@@ -17,7 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string, role: 'patient' | 'doctor' | 'admin') => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
-  verifyFace: (image: File) => Promise<void>;
+  verifyFace: (email: string, image: File) => Promise<void>;
   verifyDoctorId: (image: File) => Promise<void>;
 }
 
@@ -72,14 +72,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, role: 'patient' | 'doctor' | 'admin') => {
     try {
       setLoading(true);
-      const response = await auth.login({ email, password }, role);
+      const response = await auth.login({ email, password }, role); // Make sure this matches your API
       const { token, user } = response.data;
-
+  
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       connectSocket();
-
+  
       toast.success('Login successful!');
       
       // Navigate based on role
@@ -110,17 +110,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Logged out successfully');
   };
 
-  const verifyFace = async (image: File) => {
+  const verifyFace = async (email: string, image: File) => {
     try {
       setLoading(true);
-      const response = await auth.verifyFace(image);
+      const response = await auth.faceLogin(email, image);
       const { token, user } = response.data;
-
+  
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       connectSocket();
-
+  
       navigate('/patient/dashboard', { replace: true });
       toast.success('Face verification successful!');
     } catch (error) {
@@ -129,7 +129,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   };
-
   const verifyDoctorId = async (image: File) => {
     try {
       setLoading(true);
@@ -143,12 +142,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithToken = async (token: string) => {
+    try {
+      setLoading(true);
+      localStorage.setItem('token', token);
+      const response = await auth.getCurrentUser();
+      const user = response.data;
+      
+      localStorage.setItem('user', JSON.stringify(user));
+      setUser(user);
+      connectSocket();
+  
+      toast.success('Login successful!');
+      
+      // Navigate based on role
+      switch (user.role) {
+        case 'doctor':
+          navigate('/doctor/dashboard', { replace: true });
+          break;
+        case 'patient':
+          navigate('/patient/dashboard', { replace: true });
+          break;
+        case 'admin':
+          navigate('/admin/dashboard', { replace: true });
+          break;
+      }
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
         login,
+        loginWithToken,
         register,
         logout,
         verifyFace,
