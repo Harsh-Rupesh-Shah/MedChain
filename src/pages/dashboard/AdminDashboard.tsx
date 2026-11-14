@@ -11,6 +11,7 @@ interface DoctorVerification {
   licenseNumber: string;
   experience: number;
   idCardImage: string;
+  rawIdCardName?: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }
@@ -20,10 +21,45 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorVerification | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [isPdfFile, setIsPdfFile] = useState(false);
 
   useEffect(() => {
     loadPendingDoctors();
   }, []);
+
+  useEffect(() => {
+    let activeUrl = '';
+    if (selectedDoctor) {
+      setPreviewLoading(true);
+      setImgError(false);
+      const endpoint = `/admin/doctor-id/${selectedDoctor._id}`;
+      api.get(endpoint, { responseType: 'blob' })
+        .then((res) => {
+          const contentType = res.headers['content-type'] || '';
+          const isPdf = contentType.includes('pdf') || (selectedDoctor.rawIdCardName || selectedDoctor.idCardImage || '').toLowerCase().endsWith('.pdf');
+          setIsPdfFile(isPdf);
+          const blob = new Blob([res.data], { type: contentType || 'application/octet-stream' });
+          activeUrl = window.URL.createObjectURL(blob);
+          setPreviewUrl(activeUrl);
+        })
+        .catch(() => {
+          setImgError(true);
+        })
+        .finally(() => {
+          setPreviewLoading(false);
+        });
+    } else {
+      setPreviewUrl('');
+    }
+
+    return () => {
+      if (activeUrl) {
+        window.URL.revokeObjectURL(activeUrl);
+      }
+    };
+  }, [selectedDoctor]);
 
   const loadPendingDoctors = async () => {
     try {
@@ -156,12 +192,17 @@ const AdminDashboard = () => {
             </div>
 
             <div className="flex-1 min-h-[300px] max-h-[500px] bg-slate-50 rounded-lg border border-slate-200 overflow-hidden flex items-center justify-center p-2 relative">
-              {isPdf(selectedDoctor.idCardImage) ? (
+              {previewLoading ? (
+                <div className="text-center p-6 space-y-2">
+                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-xs text-slate-500 font-medium">Loading document securely...</p>
+                </div>
+              ) : isPdfFile ? (
                 <div className="text-center p-6 space-y-3">
                   <FileText className="h-16 w-16 text-indigo-500 mx-auto" />
                   <p className="text-sm font-medium text-slate-700">PDF Verification Credential</p>
                   <a
-                    href={getMediaUrl(selectedDoctor.idCardImage)}
+                    href={previewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
@@ -172,19 +213,11 @@ const AdminDashboard = () => {
               ) : imgError ? (
                 <div className="text-center p-6 space-y-3">
                   <FileText className="h-12 w-12 text-slate-400 mx-auto" />
-                  <p className="text-sm text-slate-600">Document available at direct storage link.</p>
-                  <a
-                    href={getMediaUrl(selectedDoctor.idCardImage)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-medium"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" /> Open File Link
-                  </a>
+                  <p className="text-sm text-slate-600">Verification image unavailable or not uploaded.</p>
                 </div>
               ) : (
                 <img
-                  src={getMediaUrl(selectedDoctor.idCardImage)}
+                  src={previewUrl}
                   alt="Doctor ID Card"
                   className="w-full h-full object-contain max-h-[460px] rounded"
                   onError={() => setImgError(true)}
@@ -193,14 +226,16 @@ const AdminDashboard = () => {
             </div>
 
             <div className="mt-4 pt-3 border-t flex justify-between items-center">
-              <a
-                href={getMediaUrl(selectedDoctor.idCardImage)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
-                <ExternalLink className="h-3.5 w-3.5" /> Open full image
-              </a>
+              {previewUrl && (
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> Open full document
+                </a>
+              )}
               <div className="flex space-x-3">
                 <button
                   onClick={() => handleVerification(selectedDoctor._id, 'rejected')}

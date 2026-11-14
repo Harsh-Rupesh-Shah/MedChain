@@ -88,6 +88,25 @@ const RecordsManager: React.FC = () => {
     }
   };
 
+  const handleDownloadAttachment = async (recordId: string, filename: string, originalName?: string) => {
+    try {
+      const response = await api.get(`/medical-records/${recordId}/download/${filename}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', originalName || filename);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      toast.error('Failed to download attachment');
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
@@ -315,23 +334,18 @@ const RecordsManager: React.FC = () => {
                     {/* Attachments preview */}
                     {record.attachments && record.attachments.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {record.attachments.map((file, idx) => {
-                          const token = localStorage.getItem('token') || '';
-                          const fileUrl = `/api/medical-records/${recordId}/download/${file.filename}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-                          return (
-                            <a
-                              key={idx}
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors border border-slate-200"
-                              title="Click to view/download attachment"
-                            >
-                              <Download className="h-3 w-3 text-slate-500" />
-                              <span>{file.originalName || file.filename}</span>
-                            </a>
-                          );
-                        })}
+                        {record.attachments.map((file, idx) => (
+                          <button
+                            type="button"
+                            key={idx}
+                            onClick={() => handleDownloadAttachment(recordId, file.filename, file.originalName)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors border border-slate-200"
+                            title="Click to securely download attachment"
+                          >
+                            <Download className="h-3 w-3 text-slate-500" />
+                            <span>{file.originalName || file.filename}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>

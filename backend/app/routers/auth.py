@@ -7,7 +7,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, status, Request
 from pydantic import BaseModel
 
-from backend.app.config import UPLOADS_DIR, BASE_DIR
+from backend.app.config import UPLOADS_DIR, BASE_DIR, ADMIN_EMAIL, ADMIN_PASSWORD
 from backend.app.database import db_manager
 from backend.app.auth.security import (
     hash_password,
@@ -16,6 +16,15 @@ from backend.app.auth.security import (
     get_current_user
 )
 from backend.app.auth.face import verify_face
+from backend.app.services.upload_validator import (
+    validate_and_read_upload,
+    ALLOWED_RECORD_EXTENSIONS,
+    ALLOWED_RECORD_MIMES,
+    ALLOWED_IMAGE_EXTENSIONS,
+    ALLOWED_IMAGE_MIMES,
+    MAX_RECORD_SIZE,
+    MAX_IMAGE_SIZE
+)
 
 logger = logging.getLogger("medchain.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -55,10 +64,16 @@ async def register_patient(
 
     face_rel_path = None
     if biometricData and biometricData.filename:
-        filename = f"{int(time.time()*1000)}-{biometricData.filename}"
+        clean_name, content = await validate_and_read_upload(
+            biometricData,
+            allowed_extensions=ALLOWED_IMAGE_EXTENSIONS,
+            allowed_mimes=ALLOWED_IMAGE_MIMES,
+            max_size_bytes=MAX_IMAGE_SIZE,
+            field_label="Biometric face image"
+        )
+        filename = f"{int(time.time()*1000)}-{clean_name}"
         dest_path = UPLOADS_DIR / "faces" / filename
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        content = await biometricData.read()
         with open(dest_path, "wb") as f:
             f.write(content)
         face_rel_path = f"/uploads/faces/{filename}"
@@ -151,10 +166,16 @@ async def register_doctor(
     if existing:
         raise HTTPException(status_code=400, detail="User already exists with this email")
 
-    filename = f"{int(time.time()*1000)}-{idCardImage.filename}"
+    clean_name, content = await validate_and_read_upload(
+        idCardImage,
+        allowed_extensions=ALLOWED_RECORD_EXTENSIONS,
+        allowed_mimes=ALLOWED_RECORD_MIMES,
+        max_size_bytes=MAX_IMAGE_SIZE,
+        field_label="Doctor ID card document"
+    )
+    filename = f"{int(time.time()*1000)}-{clean_name}"
     dest_path = UPLOADS_DIR / "doctor-ids" / filename
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    content = await idCardImage.read()
     with open(dest_path, "wb") as f:
         f.write(content)
     id_card_rel_path = f"/uploads/doctor-ids/{filename}"
@@ -319,10 +340,19 @@ async def login_doctor(req: LoginRequest):
 
 @router.post("/admin/login")
 async def login_admin(req: LoginRequest):
-    if req.email != "hrsshah04022004@gmail.com" or req.password != "Moon@11light":
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    users_col = db_manager.get_collection("users")
+    db_admin = await users_col.find_one({"email": req.email, "role": "admin"})
 
-    admin_id = "admin-" + req.email.encode("utf-8").hex()
+    valid = False
+    if db_admin:
+        valid = verify_password(req.password, db_admin.get("password", ""))
+    elif req.email == ADMIN_EMAIL and req.password == ADMIN_PASSWORD:
+        valid = True
+
+    if not valid:
+        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+
+    admin_id = str(db_admin["_id"]) if db_admin else ("admin-" + req.email.encode("utf-8").hex())
     token = create_access_token({
         "userId": admin_id,
         "role": "admin",
@@ -335,7 +365,7 @@ async def login_admin(req: LoginRequest):
             "_id": admin_id,
             "email": req.email,
             "role": "admin",
-            "name": "Admin"
+            "name": db_admin.get("name", "System Administrator") if db_admin else "System Administrator"
         }
     }
 
@@ -363,11 +393,17 @@ async def face_login(
     if not patient or not patient.get("biometricData", {}).get("image"):
         raise HTTPException(status_code=404, detail="No face data found for this patient")
 
-    # Save uploaded face temporarily
+    # Validate and save uploaded face temporarily
+    clean_name, content = await validate_and_read_upload(
+        face,
+        allowed_extensions=ALLOWED_IMAGE_EXTENSIONS,
+        allowed_mimes=ALLOWED_IMAGE_MIMES,
+        max_size_bytes=MAX_IMAGE_SIZE,
+        field_label="Verification face image"
+    )
     filename = f"{int(time.time()*1000)}-face-login.jpg"
     temp_uploaded_path = UPLOADS_DIR / "faces" / filename
     temp_uploaded_path.parent.mkdir(parents=True, exist_ok=True)
-    content = await face.read()
     with open(temp_uploaded_path, "wb") as f:
         f.write(content)
 
@@ -400,9 +436,9 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     if role == "admin":
         return {
             "_id": current_user["userId"],
-            "email": current_user.get("email", "hrsshah04022004@gmail.com"),
+            "email": current_user.get("email", ADMIN_EMAIL),
             "role": "admin",
-            "name": "Admin"
+            "name": "System Administrator"
         }
 
     users_col = db_manager.get_collection("users")

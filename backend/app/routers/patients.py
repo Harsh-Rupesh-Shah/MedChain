@@ -9,6 +9,15 @@ from backend.app.config import UPLOADS_DIR, BASE_DIR
 from backend.app.database import db_manager, convert_object_ids
 from backend.app.auth.security import require_role, hash_password, verify_password, get_current_user
 from backend.app.auth.face import verify_face
+from backend.app.services.upload_validator import (
+    validate_and_read_upload,
+    ALLOWED_RECORD_EXTENSIONS,
+    ALLOWED_RECORD_MIMES,
+    ALLOWED_IMAGE_EXTENSIONS,
+    ALLOWED_IMAGE_MIMES,
+    MAX_RECORD_SIZE,
+    MAX_IMAGE_SIZE
+)
 
 logger = logging.getLogger("medchain.patients")
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -100,15 +109,21 @@ async def create_patient_record(
     if attachments:
         for f in attachments:
             if f.filename:
-                unique_name = f"{int(time.time()*1000)}-{f.filename}"
+                clean_name, content = await validate_and_read_upload(
+                    f,
+                    allowed_extensions=ALLOWED_RECORD_EXTENSIONS,
+                    allowed_mimes=ALLOWED_RECORD_MIMES,
+                    max_size_bytes=MAX_RECORD_SIZE,
+                    field_label="Medical record attachment"
+                )
+                unique_name = f"{int(time.time()*1000)}-{clean_name}"
                 dest = UPLOADS_DIR / "medical-records" / unique_name
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                content = await f.read()
                 with open(dest, "wb") as out_f:
                     out_f.write(content)
                 saved_attachments.append({
                     "filename": unique_name,
-                    "originalName": f.filename,
+                    "originalName": clean_name,
                     "path": f"uploads/medical-records/{unique_name}",
                     "mimetype": f.content_type
                 })
@@ -134,8 +149,9 @@ async def delete_patient_record(
 ):
     records_col = db_manager.get_collection("medical_records")
     res = await records_col.delete_one({"_id": record_id, "patient": current_user["userId"]})
-    if not res:
-        raise HTTPException(status_code=404, detail="Record not found")
+    deleted_count = getattr(res, "deleted_count", 1 if res else 0)
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Record not found or access denied")
     return {"message": "Record deleted successfully"}
 
 @router.post("/verify-face")
@@ -148,9 +164,17 @@ async def verify_patient_face(
     if not patient or not patient.get("biometricData", {}).get("image"):
         raise HTTPException(status_code=404, detail="No face data found for this patient")
 
+    clean_name, content = await validate_and_read_upload(
+        face,
+        allowed_extensions=ALLOWED_IMAGE_EXTENSIONS,
+        allowed_mimes=ALLOWED_IMAGE_MIMES,
+        max_size_bytes=MAX_IMAGE_SIZE,
+        field_label="Verification face image"
+    )
+
     filename = f"{int(time.time()*1000)}-verify-face.jpg"
     dest = UPLOADS_DIR / "faces" / filename
-    content = await face.read()
+    dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as f:
         f.write(content)
 

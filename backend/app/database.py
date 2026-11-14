@@ -5,7 +5,7 @@ import logging
 from bson import ObjectId
 from datetime import datetime, date
 from pathlib import Path
-from backend.app.config import MONGODB_URI, BASE_DIR
+from backend.app.config import MONGODB_URI, BASE_DIR, NODE_ENV
 
 logger = logging.getLogger("medchain.database")
 
@@ -409,12 +409,18 @@ class DatabaseManager:
                 logger.info("Connected to MongoDB Atlas successfully!")
                 return
             except Exception as e:
+                if NODE_ENV == "production":
+                    logger.error(f"FATAL: Production MongoDB connection failed ({e}). Halting startup to prevent data divergence.")
+                    raise RuntimeError(f"FATAL: Database connection failed in production: {e}")
                 logger.warning(f"Could not connect to MongoDB Atlas ({e}). Operating in reliable local document store mode.")
+        else:
+            if NODE_ENV == "production":
+                raise RuntimeError("FATAL: MONGODB_URI environment variable is missing in production.")
         
-        # Fallback to local storage
+        # Fallback to local storage (only permitted in non-production environments)
         self.db = self.local_db
         self.is_motor = False
-        logger.info("Using embedded persistent document store for MedChain.")
+        logger.info("Using embedded persistent document store for MedChain development environment.")
 
     def get_collection(self, name: str):
         if self.is_motor and self.db is not None:

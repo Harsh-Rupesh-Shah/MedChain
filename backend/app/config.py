@@ -1,6 +1,10 @@
 import os
+import secrets
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
+
+logger = logging.getLogger("medchain.config")
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -17,9 +21,31 @@ if local_env.exists():
 
 PORT = int(os.getenv("PORT", 8000))
 MONGODB_URI = os.getenv("MONGODB_URI", "")
-JWT_SECRET = os.getenv("JWT_SECRET", "3a7d5f9b2c4e6a8d1f0e3c5b7a9d2e4f6a8c1d3e5f7b9a2c4e6d8f0a1b3c5d7e9")
 NODE_ENV = os.getenv("NODE_ENV", "development")
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173")
+
+# JWT Configuration & Production Secret Validation
+DEFAULT_INSECURE_SECRET = "3a7d5f9b2c4e6a8d1f0e3c5b7a9d2e4f6a8c1d3e5f7b9a2c4e6d8f0a1b3c5d7e9"
+raw_jwt_secret = os.getenv("JWT_SECRET", "").strip()
+
+if NODE_ENV == "production":
+    if not raw_jwt_secret or raw_jwt_secret == DEFAULT_INSECURE_SECRET or len(raw_jwt_secret) < 32:
+        raise RuntimeError("FATAL: Insecure or default JWT_SECRET in production. Set a cryptographically strong secret (>= 32 chars) in environment.")
+    JWT_SECRET = raw_jwt_secret
+else:
+    if not raw_jwt_secret or raw_jwt_secret == DEFAULT_INSECURE_SECRET:
+        logger.warning("Using default or auto-generated JWT secret for development. Configure JWT_SECRET in .env for production.")
+        JWT_SECRET = raw_jwt_secret or secrets.token_hex(32)
+    else:
+        JWT_SECRET = raw_jwt_secret
+
+# Admin Identity Configuration
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "hrsshah04022004@gmail.com")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Moon@11light")
+
+# CORS Origins (never use wildcard '*' with credentials in production)
+raw_cors = os.getenv("CORS_ORIGINS", f"{CLIENT_URL},http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000")
+CORS_ORIGINS = [orig.strip() for orig in raw_cors.split(",") if orig.strip() and orig.strip() != "*"]
 
 # SMTP Configuration
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")

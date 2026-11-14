@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 import socketio
 
-from backend.app.config import CLIENT_URL, UPLOADS_DIR, BASE_DIR
+from backend.app.config import CLIENT_URL, UPLOADS_DIR, BASE_DIR, CORS_ORIGINS
 from backend.app.database import db_manager, seed_initial_data_if_empty
 from backend.app.services.socket import sio
 from backend.app.routers import (
@@ -45,23 +45,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
-allowed_origins = [
-    CLIENT_URL,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    "*"
-]
-
+# CORS Configuration (Strict Origins Allowlist without Wildcards)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -74,12 +63,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 # Static file mounts
-# Ensure upload directory exists
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="api_uploads")
+# NOTE: Public static mounts of /uploads and /api/uploads were deliberately removed
+# to prevent unauthorized access to sensitive medical records, doctor IDs, and facial biometric captures.
+# All medical record attachments and doctor credentials are served via authenticated, authorized endpoints.
 
-# Models for face recognition in frontend
+# Public models for client-side face detection
 models_dir = BASE_DIR / "public" / "models"
 if not models_dir.exists():
     models_dir = BASE_DIR / "server" / "models"
