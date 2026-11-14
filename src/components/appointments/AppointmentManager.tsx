@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Video, MapPin, AlertCircle, Plus, X } from 'lucide-react';
+import { Calendar, Clock, Video, MapPin, AlertCircle, Plus, X, Link2, ExternalLink } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -152,6 +152,9 @@ const AppointmentManager = () => {
     }
   };
 
+  const [editingMeetId, setEditingMeetId] = useState<string | null>(null);
+  const [customMeetLink, setCustomMeetLink] = useState('');
+
   const handleCancel = async (appointmentId: string) => {
     try {
       await api.put(`/appointments/${appointmentId}/status`, { status: 'cancelled' });
@@ -162,8 +165,21 @@ const AppointmentManager = () => {
     }
   };
 
+  const handleSaveMeetLink = async (appointmentId: string) => {
+    if (!customMeetLink.trim()) return;
+    try {
+      await api.put(`/appointments/${appointmentId}/meet-link`, { meetLink: customMeetLink.trim() });
+      toast.success('Consultation Google Meet link updated!');
+      setEditingMeetId(null);
+      setCustomMeetLink('');
+      loadAppointments();
+    } catch (error) {
+      toast.error('Failed to update meeting link');
+    }
+  };
+
   const handleJoinMeeting = (meetLink: string) => {
-    window.open(meetLink, '_blank');
+    window.open(meetLink || 'https://meet.google.com/new', '_blank');
   };
 
   return (
@@ -210,14 +226,29 @@ const AppointmentManager = () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {apt.type === 'video' && apt.status === 'scheduled' && apt.meetLink && (
-                      <button
-                        onClick={() => handleJoinMeeting(apt.meetLink!)}
-                        className="btn-primary text-sm"
-                      >
-                        <Video className="h-4 w-4 mr-1 inline" />
-                        Join Call
-                      </button>
+                    {apt.type === 'video' && apt.status === 'scheduled' && (
+                      <>
+                        <button
+                          onClick={() => handleJoinMeeting(apt.meetLink || 'https://meet.google.com/new')}
+                          className="btn-primary text-sm flex items-center"
+                          title="Open Google Meet"
+                        >
+                          <Video className="h-4 w-4 mr-1 inline" />
+                          Join Call
+                        </button>
+                        {user?.role === 'doctor' && (
+                          <button
+                            onClick={() => {
+                              setEditingMeetId(apt._id);
+                              setCustomMeetLink(apt.meetLink || '');
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded text-xs border border-slate-200 transition-colors"
+                            title="Edit / Set Google Meet Link"
+                          >
+                            <Link2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
                     )}
                     {apt.status === 'scheduled' && (
                       <button
@@ -229,6 +260,45 @@ const AppointmentManager = () => {
                     )}
                   </div>
                 </div>
+
+                {editingMeetId === apt._id && (
+                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-slate-700">Set Consultation Room Link</span>
+                      <button
+                        type="button"
+                        onClick={() => window.open('https://meet.google.com/new', '_blank')}
+                        className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Create on Google Meet
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customMeetLink}
+                        onChange={(e) => setCustomMeetLink(e.target.value)}
+                        placeholder="https://meet.google.com/..."
+                        className="input-field text-xs flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSaveMeetLink(apt._id)}
+                        className="px-3 py-1 bg-indigo-600 text-white rounded text-xs font-semibold hover:bg-indigo-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingMeetId(null)}
+                        className="px-2 py-1 text-slate-500 hover:bg-slate-200 rounded text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {apt.notes && (
                   <p className="mt-2 text-sm text-slate-600">{apt.notes}</p>
                 )}

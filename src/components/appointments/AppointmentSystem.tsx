@@ -143,7 +143,7 @@ const AppointmentSystem = () => {
   };
 
   const handleJoinMeeting = (meetLink: string) => {
-    window.open(meetLink, '_blank');
+    window.open(meetLink || 'https://meet.google.com/new', '_blank');
   };
 
   return (
@@ -185,10 +185,11 @@ const AppointmentSystem = () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {apt.type === 'video' && apt.status === 'scheduled' && apt.meetLink && (
+                    {apt.type === 'video' && apt.status === 'scheduled' && (
                       <button
-                        onClick={() => handleJoinMeeting(apt.meetLink!)}
-                        className="btn-primary text-sm"
+                        onClick={() => handleJoinMeeting(apt.meetLink || 'https://meet.google.com/new')}
+                        className="btn-primary text-sm flex items-center"
+                        title="Join Google Meet"
                       >
                         <Video className="h-4 w-4 mr-1 inline" />
                         Join Call

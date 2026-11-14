@@ -22,6 +22,7 @@ interface Profile {
   specialization?: string;
   licenseNumber?: string;
   experience?: number;
+  meetLink?: string;
 }
 
 const defaultProfile: Profile = {
@@ -34,6 +35,7 @@ const defaultProfile: Profile = {
   bloodGroup: '',
   allergies: [],
   chronicConditions: [],
+  meetLink: '',
   emergencyContact: {
     name: '',
     relationship: '',
@@ -378,6 +380,46 @@ const ProfileSection = () => {
               </>
             )}
           </div>
+
+          {/* Telemedicine & Google Meet Consultation Link for Doctors */}
+          {user?.role === 'doctor' && (
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <h3 className="text-lg font-semibold mb-1 text-slate-900">Telemedicine Consultation Room</h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Configure your dedicated Google Meet room for scheduled video appointments with patients.
+              </p>
+              <div className="max-w-xl">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Google Meet Link
+                </label>
+                {editing ? (
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      value={editedProfile.meetLink || ''}
+                      onChange={(e) => setEditedProfile({
+                        ...editedProfile,
+                        meetLink: e.target.value
+                      })}
+                      placeholder="https://meet.google.com/..."
+                      className="input-field"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => window.open('https://meet.google.com/new', '_blank')}
+                      className="text-xs text-indigo-600 hover:underline font-medium inline-flex items-center gap-1"
+                    >
+                      Open Google Meet to create your room
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-slate-800 font-mono text-sm bg-slate-50 p-2.5 rounded border border-slate-200">
+                    {profile.meetLink || 'https://meet.google.com/new (Instant Google Meet)'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Emergency Contact */}
           <div className="mt-8">
