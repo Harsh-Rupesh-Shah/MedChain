@@ -1,7 +1,7 @@
 // pages/auth/Login.tsx
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Face } from 'lucide-react';
+import { User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 // import api from '../../services/api';

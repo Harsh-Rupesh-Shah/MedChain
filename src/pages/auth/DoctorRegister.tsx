@@ -1,10 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Phone, Briefcase, FileText, X } from 'lucide-react';
+import {
+  User,
+  Mail,
+  Lock,
+  Phone,
+  Briefcase,
+  FileText,
+  X,
+  Upload,
+  CheckCircle2,
+  ShieldCheck,
+  Stethoscope
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../services/api';
 
-const DoctorRegister = () => {
+const DoctorRegister: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,6 +34,24 @@ const DoctorRegister = () => {
     idCardImage: null as File | null
   });
 
+  const specializations = [
+    'Cardiology',
+    'Dermatology',
+    'Endocrinology',
+    'Gastroenterology',
+    'General Medicine',
+    'Neurology',
+    'Obstetrics and Gynecology',
+    'Oncology',
+    'Ophthalmology',
+    'Orthopedics',
+    'Pediatrics',
+    'Psychiatry',
+    'Pulmonology',
+    'Radiology',
+    'Urology'
+  ];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
@@ -37,7 +67,6 @@ const DoctorRegister = () => {
         idCardImage: file
       }));
 
-      // Create preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -63,19 +92,25 @@ const DoctorRegister = () => {
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (!formData.specialization) {
+      setError('Please select a specialization');
+      toast.error('Please select a specialization');
       return;
     }
 
     if (!formData.idCardImage) {
-      setError('Please upload your ID card');
+      setError('Please upload your Medical License / ID Card for credential verification');
+      toast.error('Please upload your Medical License / ID Card');
       return;
     }
 
     try {
       setLoading(true);
       const formDataObj = new FormData();
-      
-      // Append all text fields
       formDataObj.append('name', formData.name);
       formDataObj.append('email', formData.email);
       formDataObj.append('password', formData.password);
@@ -83,19 +118,15 @@ const DoctorRegister = () => {
       formDataObj.append('specialization', formData.specialization);
       formDataObj.append('licenseNumber', formData.licenseNumber);
       formDataObj.append('experience', formData.experience);
-      
-      // Append the file with the correct field name
-      if (formData.idCardImage) {
-        formDataObj.append('idCardImage', formData.idCardImage);
-      }
+      formDataObj.append('idCardImage', formData.idCardImage);
 
-      const response = await api.post('/auth/doctor/register', formDataObj, {
+      await api.post('/auth/doctor/register', formDataObj, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      toast.success('Registration submitted! Please wait for admin approval.');
+      toast.success('Registration submitted! Account is pending administrative credential review.');
       navigate('/login');
     } catch (err: any) {
       const message = err.response?.data?.message || 'Registration failed';
@@ -107,192 +138,233 @@ const DoctorRegister = () => {
   };
 
   return (
-    <div className="min-h-screen py-12 bg-gradient-to-br from-indigo-50 to-emerald-50">
-      <div className="container-custom">
-        <div className="auth-form">
-          <h2 className="text-2xl font-bold text-center mb-8">Doctor Registration</h2>
+    <div className="min-h-screen py-12 bg-[#F8FAFC]">
+      <div className="container-custom max-w-xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+          <div className="text-center mb-8">
+            <div className="w-12 h-12 rounded-xl bg-[#0B192C] text-emerald-400 flex items-center justify-center mx-auto mb-3 shadow-xs">
+              <Stethoscope className="h-6 w-6" />
+            </div>
+            <h2 className="text-2xl font-bold text-[#0B192C]">Physician Credential Intake</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Join MedChain's accredited clinical network. All applications undergo ABMS and state licensure verification.
+            </p>
+          </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg">
+            <div className="mb-6 p-3 bg-red-50 text-red-700 border border-red-200 text-xs rounded-lg">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Full Name
+              <label className="block font-semibold text-slate-700 mb-1">
+                Full Legal Name (with MD/DO/MBBS) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
                   name="name"
-                  className="input-field pl-10"
-                  placeholder="Enter your full name"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                  placeholder="e.g. Dr. Jonathan R. Vance, MD"
                   value={formData.name}
                   onChange={handleChange}
                   required
                 />
-                <User className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
+                <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Email
-              </label>
-              <div className="relative">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Professional Email <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    name="email"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                    placeholder="doctor@hospital.org"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Direct Phone <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    name="phone"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                    placeholder="(555) 012-3456"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                  />
+                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    name="password"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                    placeholder="Min 6 characters"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    minLength={6}
+                  />
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                    placeholder="Repeat password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                  />
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Primary Specialization <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    name="specialization"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                    value={formData.specialization}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Select Specialization...</option>
+                    {specializations.map((spec) => (
+                      <option key={spec} value={spec}>
+                        {spec}
+                      </option>
+                    ))}
+                  </select>
+                  <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Years of Practice <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="email"
-                  name="email"
-                  className="input-field pl-10"
-                  placeholder="Enter your email"
-                  value={formData.email}
+                  type="number"
+                  name="experience"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                  placeholder="e.g. 10"
+                  value={formData.experience}
                   onChange={handleChange}
                   required
+                  min="0"
                 />
-                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  name="password"
-                  className="input-field pl-10"
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  minLength={6}
-                />
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  className="input-field pl-10"
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                />
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Phone Number
-              </label>
-              <div className="relative">
-                <input
-                  type="tel"
-                  name="phone"
-                  className="input-field pl-10"
-                  placeholder="Enter your phone number"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  required
-                />
-                <Phone className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Specialization
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  name="specialization"
-                  className="input-field pl-10"
-                  placeholder="Enter your specialization"
-                  value={formData.specialization}
-                  onChange={handleChange}
-                  required
-                />
-                <Briefcase className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                License Number
+              <label className="block font-semibold text-slate-700 mb-1">
+                State Medical License / NPI Number <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
                   name="licenseNumber"
-                  className="input-field pl-10"
-                  placeholder="Enter any alphanumeric value (e.g., DOC123)"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                  placeholder="e.g. MD-982148 or NPI #1942093104"
                   value={formData.licenseNumber}
                   onChange={handleChange}
                   required
                 />
-                <FileText className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
+                <FileText className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                For testing, you can enter any alphanumeric value
-              </p>
             </div>
 
+            {/* Redesigned Clinical Upload Area */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Years of Experience
+              <label className="block font-semibold text-slate-700 mb-1.5">
+                Medical License or Hospital ID Document <span className="text-red-500">*</span>
               </label>
-              <input
-                type="number"
-                name="experience"
-                className="input-field"
-                placeholder="Enter years of experience"
-                value={formData.experience}
-                onChange={handleChange}
-                required
-                min="0"
-              />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                ID Card Image
-              </label>
-              <input
-                type="file"
-                name="idCardImage"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="input-field"
-                required
-                ref={fileInputRef}
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                For testing, you can upload any image file
-              </p>
-
-              {imagePreview && (
-                <div className="mt-4 relative">
-                  <img
-                    src={imagePreview}
-                    alt="ID Card Preview"
-                    className="max-w-full h-auto rounded-lg"
+              {!imagePreview ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-[#0D9488] bg-slate-50/60 hover:bg-slate-50 rounded-xl p-6 text-center cursor-pointer transition-all group"
+                >
+                  <input
+                    type="file"
+                    name="idCardImage"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    ref={fileInputRef}
                   />
+                  <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 group-hover:border-[#0D9488] flex items-center justify-center mx-auto mb-2 text-slate-500 group-hover:text-[#0D9488] shadow-xs transition-colors">
+                    <Upload className="h-5 w-5" />
+                  </div>
+                  <div className="font-semibold text-slate-800 mb-0.5">
+                    Click to select medical ID document
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Supports high-resolution JPG, PNG or photo of state license / hospital badge
+                  </div>
+                </div>
+              ) : (
+                <div className="relative border border-emerald-200 bg-emerald-50/50 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <img
+                      src={imagePreview}
+                      alt="ID Preview"
+                      className="w-14 h-14 rounded-lg object-cover border border-emerald-300"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>{formData.idCardImage?.name || 'Medical-License-Attached'}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {formData.idCardImage ? `${(formData.idCardImage.size / 1024).toFixed(1)} KB` : 'Verified Image File'}
+                      </div>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={clearImage}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                    title="Remove File"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -300,18 +372,21 @@ const DoctorRegister = () => {
               )}
             </div>
 
-            <button
-              type="submit"
-              className="btn-primary w-full"
-              disabled={loading}
-            >
-              {loading ? 'Registering...' : 'Register'}
-            </button>
+            <div className="pt-3">
+              <button
+                type="submit"
+                className="w-full py-3 px-4 bg-[#0B192C] hover:bg-[#1E3A8A] text-white font-semibold rounded-lg text-xs shadow-xs transition-colors"
+                disabled={loading}
+              >
+                {loading ? 'Submitting Credentials...' : 'Submit Physician Registration'}
+              </button>
+            </div>
           </form>
 
-          <div className="mt-4 text-center">
-            <Link to="/login" className="text-indigo-600 hover:text-indigo-700">
-              Already have an account? Login here
+          <div className="mt-6 text-center text-xs text-slate-500">
+            Already verified on MedChain?{' '}
+            <Link to="/login" className="text-[#0D9488] font-semibold hover:underline">
+              Sign In to Provider Portal
             </Link>
           </div>
         </div>

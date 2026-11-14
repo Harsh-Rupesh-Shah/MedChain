@@ -70,7 +70,7 @@ const PatientRegister = () => {
       formDataToSend.append('gender', formData.gender);
       formDataToSend.append('biometricData', file);
   
-      const response = await api.post('auth/patient/register', formDataToSend, {
+      const response = await api.post('/auth/patient/register', formDataToSend, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
