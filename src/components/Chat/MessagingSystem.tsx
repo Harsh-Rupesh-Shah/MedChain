@@ -28,6 +28,7 @@ const MessagingSystem = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sending, setSending] = useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,20 +39,26 @@ const MessagingSystem = () => {
       joinRoom(user._id);
     }
 
-    // Socket event listeners
-    socket.on('new_message', (message: Message) => {
-      console.log('Received new message:', message);
-      setMessages(prev => [...prev, message]);
+    // Socket event listeners with deduplication
+    const handleNewMessage = (message: Message) => {
+      setMessages(prev => {
+        if (prev.some(m => m._id === message._id)) {
+          return prev;
+        }
+        return [...prev, message];
+      });
       scrollToBottom();
       
-      // Show notification if message is from selected user
-      if (message.sender._id === selectedUser) {
+      // Show notification if message is from the other user
+      if (message.sender?._id === selectedUser && message.sender?._id !== user?._id) {
         toast.success(`New message from ${message.sender.name}`);
       }
-    });
+    };
+
+    socket.on('new_message', handleNewMessage);
 
     return () => {
-      socket.off('new_message');
+      socket.off('new_message', handleNewMessage);
     };
   }, [user?._id, selectedUser]);
 
@@ -98,30 +105,35 @@ const MessagingSystem = () => {
   };
 
   const sendMessage = async () => {
-    if (!selectedUser || !newMessage.trim()) return;
+    if (!selectedUser || !newMessage.trim() || sending) return;
+
+    const messageContent = newMessage.trim();
+    setNewMessage('');
+    setSending(true);
 
     try {
       const messageData = {
         receiverId: selectedUser,
-        content: newMessage.trim()
+        content: messageContent
       };
 
       const response = await api.post('/messages', messageData);
       
-      // Add the new message to the messages array
-      setMessages(prev => [...prev, response.data]);
-      setNewMessage('');
-      scrollToBottom();
-
-      // Emit socket event
-      socket.emit('private_message', {
-        receiverId: selectedUser,
-        content: newMessage.trim()
-      });
-
-      toast.success('Message sent');
+      // Deduplicate and append sent message
+      if (response.data) {
+        setMessages(prev => {
+          if (prev.some(m => m._id === response.data._id)) {
+            return prev;
+          }
+          return [...prev, response.data];
+        });
+        scrollToBottom();
+      }
     } catch (error) {
       toast.error('Failed to send message');
+      setNewMessage(messageContent);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -226,7 +238,8 @@ const MessagingSystem = () => {
                 />
                 <button
                   onClick={sendMessage}
-                  className="p-2 bg-indigo-500 text-white rounded-full hover:bg-indigo-600"
+                  disabled={sending || !newMessage.trim()}
+                  className="p-2 bg-indigo-500 text-white rounded-full hover:bg-indigo-600 disabled:opacity-50 transition-opacity"
                 >
                   <Send className="h-5 w-5" />
                 </button>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -32,7 +32,7 @@ api.interceptors.response.use(
 
     if (error.response) {
       // Server responded with error
-      errorMessage = error.response.data?.message || 'Server error';
+      errorMessage = error.response.data?.message || error.response.data?.detail || 'Server error';
 
       // Only redirect to login for 401 errors if not already on the login page
       if (error.response.status === 401 && !window.location.pathname.includes('/login')) {

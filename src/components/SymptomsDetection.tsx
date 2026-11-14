@@ -67,6 +67,62 @@ const medicalKnowledge = {
     ],
     urgencyLevel: 'high'
   },
+  cough: {
+    conditions: [
+      {
+        condition: 'Upper Respiratory Infection',
+        probability: 0.75,
+        description: 'Infection of the upper airways such as common cold or bronchitis',
+        specialists: ['Pulmonologist', 'General Physician']
+      },
+      {
+        condition: 'Allergic Cough',
+        probability: 0.5,
+        description: 'Cough triggered by seasonal environmental allergens',
+        specialists: ['Allergist', 'ENT Specialist']
+      }
+    ],
+    urgencyLevel: 'low'
+  },
+  stomach: {
+    conditions: [
+      {
+        condition: 'Gastritis / Acid Reflux',
+        probability: 0.7,
+        description: 'Inflammation of stomach lining with acidity and discomfort',
+        specialists: ['Gastroenterologist', 'General Physician']
+      },
+      {
+        condition: 'Gastroenteritis',
+        probability: 0.5,
+        description: 'Stomach flu or digestive tract infection',
+        specialists: ['Gastroenterologist', 'Internal Medicine']
+      }
+    ],
+    urgencyLevel: 'medium'
+  },
+  throat: {
+    conditions: [
+      {
+        condition: 'Pharyngitis (Sore Throat)',
+        probability: 0.8,
+        description: 'Inflammation of the throat caused by viral or bacterial infection',
+        specialists: ['ENT Specialist', 'General Physician']
+      }
+    ],
+    urgencyLevel: 'low'
+  },
+  back: {
+    conditions: [
+      {
+        condition: 'Lumbar Muscle Strain',
+        probability: 0.75,
+        description: 'Sprain or strain in the lower back muscles and ligaments',
+        specialists: ['Orthopedic Specialist', 'Physiotherapist']
+      }
+    ],
+    urgencyLevel: 'low'
+  },
   // Add more symptoms and conditions as needed
 };
 
