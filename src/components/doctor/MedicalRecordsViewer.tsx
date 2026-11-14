@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, FileText } from 'lucide-react';
+import { Search, Filter, Download, FileText, Eye, X, ExternalLink } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'react-hot-toast';
 
@@ -34,6 +34,12 @@ const MedicalRecordsViewer = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [recordType, setRecordType] = useState('all');
+  const [previewDoc, setPreviewDoc] = useState<{
+    url: string;
+    name: string;
+    isPdf: boolean;
+    isImage: boolean;
+  } | null>(null);
 
   useEffect(() => {
     loadPatients();
@@ -64,7 +70,6 @@ const MedicalRecordsViewer = () => {
     try {
       setLoading(true);
       const response = await api.get(`/doctors/patients/${patientId}/records`);
-      console.log('Loaded records:', response.data); // Debug log
       setRecords(response.data);
     } catch (error) {
       console.error('Failed to load medical records:', error);
@@ -90,6 +95,30 @@ const MedicalRecordsViewer = () => {
     } catch (error) {
       console.error('Failed to download file:', error);
       toast.error('Failed to download file');
+    }
+  };
+
+  const handleView = async (recordId: string, filename: string, originalName?: string) => {
+    try {
+      const isPdf = filename.toLowerCase().endsWith('.pdf') || (originalName?.toLowerCase().endsWith('.pdf') ?? false);
+      const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(filename) || /\.(jpg|jpeg|png|webp|gif)$/i.test(originalName || '');
+
+      const response = await api.get(`/medical-records/${recordId}/download/${filename}`, {
+        responseType: 'blob'
+      });
+      const mime = isPdf ? 'application/pdf' : (isImage ? 'image/jpeg' : response.data.type || 'application/octet-stream');
+      const blob = new Blob([response.data], { type: mime });
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      setPreviewDoc({
+        url: blobUrl,
+        name: originalName || filename,
+        isPdf,
+        isImage
+      });
+    } catch (error) {
+      console.error('Failed to view file:', error);
+      toast.error('Failed to open document preview');
     }
   };
 
@@ -176,18 +205,28 @@ const MedicalRecordsViewer = () => {
                     {record.attachments.map((attachment, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between bg-slate-50 p-2 rounded"
+                        className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
                       >
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 text-slate-400 mr-2" />
-                          <span className="text-sm">{attachment.originalName || attachment.filename}</span>
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-indigo-500" />
+                          <span className="text-sm font-medium text-slate-800">{attachment.originalName || attachment.filename}</span>
                         </div>
-                        <button
-                          onClick={() => handleDownload(record._id, attachment.filename)}
-                          className="p-1 hover:bg-slate-200 rounded"
-                        >
-                          <Download className="h-4 w-4 text-slate-600" />
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleView(record._id, attachment.filename, attachment.originalName)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors"
+                            title="View Document"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View
+                          </button>
+                          <button
+                            onClick={() => handleDownload(record._id, attachment.filename)}
+                            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
+                            title="Download Document"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -203,6 +242,65 @@ const MedicalRecordsViewer = () => {
       ) : (
         <div className="text-center py-12 bg-white rounded-lg shadow-md">
           <p className="text-slate-500">Please select a patient to view their medical records</p>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-4xl w-full max-h-[92vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Patient Clinical Document</h3>
+                <p className="text-xs text-slate-500">{previewDoc.name}</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <a
+                  href={previewDoc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded"
+                  title="Open in new window"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="text-slate-400 hover:text-slate-700 p-1.5 rounded hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 min-h-[400px] max-h-[600px] bg-slate-50 rounded-lg border overflow-hidden flex items-center justify-center">
+              {previewDoc.isPdf ? (
+                <iframe
+                  src={previewDoc.url}
+                  title="PDF Document"
+                  className="w-full h-full min-h-[500px]"
+                />
+              ) : previewDoc.isImage ? (
+                <img
+                  src={previewDoc.url}
+                  alt="Medical Document"
+                  className="max-w-full max-h-[540px] object-contain rounded"
+                />
+              ) : (
+                <div className="text-center p-8 space-y-3">
+                  <FileText className="h-16 w-16 text-slate-400 mx-auto" />
+                  <p className="text-sm font-medium text-slate-700">{previewDoc.name}</p>
+                  <a
+                    href={previewDoc.url}
+                    download={previewDoc.name}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+                  >
+                    <Download className="h-4 w-4" /> Download File
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

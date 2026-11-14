@@ -59,13 +59,14 @@ const PatientDashboard = () => {
         <div className="flex-1 ml-64 p-8">
           <Routes>
             <Route path="/" element={<AnalyticsDashboard />} />
+            <Route path="dashboard" element={<AnalyticsDashboard />} />
             <Route path="records" element={<RecordsManager />} />
             <Route path="appointments" element={<AppointmentSystem />} />
             <Route path="pharmacy" element={<PharmacySystem />} />
-            {/* <Route path="analytics" element={<AnalyticsDashboard />} /> */}
             <Route path="messages" element={<MessagingSystem />} />
             <Route path="profile" element={<ProfileSection />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="*" element={<AnalyticsDashboard />} />
           </Routes>
         </div>
       </div>
